@@ -9,6 +9,8 @@ const PITCH_LIMIT := 1.5
 
 const WeaponScript := preload("res://scripts/player/weapon.gd")
 const WeaponPresets := preload("res://scripts/weapon_presets.gd")
+const WEAPON_SLOT_ACTIONS := ["weapon_1", "weapon_2", "weapon_3", "weapon_4", "weapon_5"]
+const RESPAWN_DELAY := 2.5
 
 @export var walk_speed: float = 6.0
 @export var crouch_speed: float = 3.0
@@ -28,26 +30,58 @@ var pitch: float = 0.0
 var mouse_captured := false
 var weapons: Array = []
 var active_weapon_index: int = 0
+var is_dead := false
+var _spawn_position: Vector3
+var _spawn_rotation_y: float
+var _audio_hurt: AudioStreamPlayer
 
 func _ready() -> void:
 	head.position.y = STAND_HEIGHT
 	_capture_mouse()
 	_setup_weapons()
+	_spawn_position = global_position
+	_spawn_rotation_y = rotation.y
+	_audio_hurt = AudioStreamPlayer.new()
+	_audio_hurt.stream = load("res://audio/player_hurt.wav")
+	add_child(_audio_hurt)
+	GameState.player_died.connect(_on_player_died)
+	GameState.player_respawned.connect(_on_player_respawned)
+	GameState.player_damaged.connect(_on_player_damaged)
+
+func _on_player_damaged(_amount: int, _health: int) -> void:
+	_audio_hurt.stop()
+	_audio_hurt.play()
+
+func _on_player_died() -> void:
+	is_dead = true
+	velocity = Vector3.ZERO
+	await get_tree().create_timer(RESPAWN_DELAY).timeout
+	GameState.respawn()
+
+func _on_player_respawned() -> void:
+	is_dead = false
+	global_position = _spawn_position
+	rotation.y = _spawn_rotation_y
+	pitch = 0.0
+	head.rotation.x = 0.0
+	velocity = Vector3.ZERO
 
 func _setup_weapons() -> void:
-	var rifle := WeaponScript.new()
-	weapon_holder.add_child(rifle)
-	rifle.setup(WeaponPresets.make_rifle(), self, camera)
-	weapons.append(rifle)
-
-	var pistol := WeaponScript.new()
-	weapon_holder.add_child(pistol)
-	pistol.setup(WeaponPresets.make_pistol(), self, camera)
-	weapons.append(pistol)
+	_add_weapon(WeaponPresets.make_rifle())
+	_add_weapon(WeaponPresets.make_pistol())
+	_add_weapon(WeaponPresets.make_smg())
+	_add_weapon(WeaponPresets.make_sniper())
+	_add_weapon(WeaponPresets.make_knife())
 
 	active_weapon_index = 0
 	for i in range(weapons.size()):
 		weapons[i].set_active(i == active_weapon_index)
+
+func _add_weapon(stats) -> void:
+	var w := WeaponScript.new()
+	weapon_holder.add_child(w)
+	w.setup(stats, self, camera)
+	weapons.append(w)
 
 func get_active_weapon() -> Node:
 	if weapons.is_empty():
@@ -91,10 +125,13 @@ func is_crouching() -> bool:
 	return Input.is_action_pressed("crouch")
 
 func _physics_process(delta: float) -> void:
-	if Input.is_action_just_pressed("weapon_1"):
-		_switch_weapon(0)
-	elif Input.is_action_just_pressed("weapon_2"):
-		_switch_weapon(1)
+	if is_dead:
+		return
+
+	for i in range(WEAPON_SLOT_ACTIONS.size()):
+		if Input.is_action_just_pressed(WEAPON_SLOT_ACTIONS[i]):
+			_switch_weapon(i)
+			break
 
 	if not is_on_floor():
 		velocity.y -= gravity * delta

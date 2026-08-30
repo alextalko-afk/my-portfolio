@@ -1,7 +1,7 @@
 extends Node3D
 ## Builds the whole shooting range procedurally: room geometry, lighting,
-## cover props, target spawn points, and instances the player + HUD.
-## Everything here is primitives/code -- no external art assets.
+## cover props, enemy squads (Terrorist + Spec Ops), and instances the
+## player + HUD. Everything here is primitives/code -- no external assets.
 
 const ARENA_WIDTH := 24.0
 const ARENA_DEPTH := 16.0
@@ -10,16 +10,14 @@ const WALL_THICKNESS := 0.5
 
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 const HUD_SCENE := preload("res://scenes/hud.tscn")
-const TargetScript := preload("res://scripts/world/target.gd")
-const TargetMovingScript := preload("res://scripts/world/target_moving.gd")
+const EnemyScript := preload("res://scripts/world/enemy.gd")
 
 func _ready() -> void:
 	_build_lighting()
 	_build_room()
 	_build_props()
-	_spawn_targets(_static_spawn_points())
-	_spawn_moving_targets(_patrol_paths())
 	var player := _spawn_player()
+	_spawn_enemies(player)
 	_spawn_hud(player)
 
 func _build_lighting() -> void:
@@ -47,9 +45,11 @@ func _build_room() -> void:
 	_add_box(Vector3(WALL_THICKNESS, ARENA_HEIGHT, ARENA_DEPTH), Vector3(ARENA_WIDTH / 2.0, ARENA_HEIGHT / 2.0, 0), Color(0.30, 0.32, 0.36))
 
 func _build_props() -> void:
-	_add_box(Vector3(1.2, 1.0, 1.2), Vector3(-4.5, 0.5, -1.0), Color(0.22, 0.24, 0.27))
-	_add_box(Vector3(1.2, 1.6, 1.2), Vector3(3.0, 0.8, -3.5), Color(0.22, 0.24, 0.27))
-	_add_box(Vector3(1.0, 0.6, 1.0), Vector3(6.5, 0.3, 1.5), Color(0.22, 0.24, 0.27))
+	_add_box(Vector3(1.4, 1.1, 1.4), Vector3(-3.0, 0.55, 2.0), Color(0.22, 0.24, 0.27))
+	_add_box(Vector3(1.4, 1.1, 1.4), Vector3(3.0, 0.55, 2.0), Color(0.22, 0.24, 0.27))
+	_add_box(Vector3(1.6, 1.3, 1.6), Vector3(-5.0, 0.65, -1.0), Color(0.22, 0.24, 0.27))
+	_add_box(Vector3(1.6, 1.3, 1.6), Vector3(5.0, 0.65, -1.0), Color(0.22, 0.24, 0.27))
+	_add_box(Vector3(1.2, 0.9, 1.2), Vector3(0.0, 0.45, -5.0), Color(0.22, 0.24, 0.27))
 
 func _add_box(size: Vector3, pos: Vector3, color: Color) -> void:
 	var body := StaticBody3D.new()
@@ -74,32 +74,33 @@ func _add_box(size: Vector3, pos: Vector3, color: Color) -> void:
 	shape.shape = box_shape
 	body.add_child(shape)
 
-func _static_spawn_points() -> Array:
-	var points := []
-	for col in range(5):
-		var x: float = -8.0 + col * 4.0
-		points.append(Vector3(x, 1.0, -7.0))
-		points.append(Vector3(x, 1.8, -6.2))
-	return points
+func _terrorist_guard_points() -> Array:
+	return [Vector3(-9.0, 0.0, -7.2), Vector3(-8.0, 0.0, -6.4), Vector3(-7.0, 0.0, -7.6)]
 
-func _patrol_paths() -> Array:
-	return [
-		[Vector3(-9.0, 1.1, -4.0), Vector3(9.0, 1.1, -4.0)],
-		[Vector3(-6.0, 1.4, -2.2), Vector3(6.0, 1.4, -2.2)],
-	]
+func _terrorist_patrol_path() -> Array:
+	return [Vector3(-9.5, 0.0, -3.5), Vector3(-2.0, 0.0, -3.5)]
 
-func _spawn_targets(points: Array) -> void:
-	var count: int = min(7, points.size())
-	for i in range(count):
-		var t := TargetScript.new()
-		add_child(t)
-		t.setup(points)
+func _specops_guard_points() -> Array:
+	return [Vector3(9.0, 0.0, -7.2), Vector3(8.0, 0.0, -6.4), Vector3(7.0, 0.0, -7.6)]
 
-func _spawn_moving_targets(paths: Array) -> void:
-	for path in paths:
-		var t := TargetMovingScript.new()
-		add_child(t)
-		t.setup_patrol(path[0], path[1], 1.8)
+func _specops_patrol_path() -> Array:
+	return [Vector3(2.0, 0.0, -3.5), Vector3(9.5, 0.0, -3.5)]
+
+func _spawn_enemies(player: Node) -> void:
+	for i in range(3):
+		_spawn_enemy(EnemyScript.Faction.TERRORIST, _terrorist_guard_points(), [], player)
+	_spawn_enemy(EnemyScript.Faction.TERRORIST, _terrorist_patrol_path(), _terrorist_patrol_path(), player)
+	_spawn_enemy(EnemyScript.Faction.TERRORIST, _terrorist_patrol_path(), _terrorist_patrol_path(), player)
+
+	for i in range(3):
+		_spawn_enemy(EnemyScript.Faction.SPEC_OPS, _specops_guard_points(), [], player)
+	_spawn_enemy(EnemyScript.Faction.SPEC_OPS, _specops_patrol_path(), _specops_patrol_path(), player)
+	_spawn_enemy(EnemyScript.Faction.SPEC_OPS, _specops_patrol_path(), _specops_patrol_path(), player)
+
+func _spawn_enemy(faction: int, spawn_points: Array, patrol_points: Array, player: Node) -> void:
+	var e := EnemyScript.new()
+	add_child(e)
+	e.setup(faction, spawn_points, patrol_points, player)
 
 func _spawn_player() -> Node:
 	var player := PLAYER_SCENE.instantiate()

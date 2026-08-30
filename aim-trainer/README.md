@@ -1,12 +1,13 @@
 # Aim Range
 
-A CS-style 3D aim trainer built in **Godot 4.3** (GDScript). Single-player,
-native desktop build (Windows/Linux/macOS) — no browser involved.
+A CS-style single-player 3D shooter built in **Godot 4.3** (GDScript).
+Native desktop build (Windows/Linux/macOS) — no browser involved.
 
-Focus of this first version: how the gunplay *feels* — source-style movement
-momentum, a learnable per-weapon recoil pattern, accuracy bloom, hit
-feedback — on a shooting range with static and moving pop-up targets.
-It is not a CS2 clone (no economy, bomb, or multiplayer) — see *Scope* below.
+You're dropped into an arena against two AI squads — **Terrorists** (tan)
+and **Spec Ops** (dark navy) — who patrol, take cover, spot you, and shoot
+back. Five weapons, source-style movement, a learnable per-weapon recoil
+pattern, and a health/respawn loop. It is not a full CS2 replica (no
+economy, bomb, or multiplayer) — see *Scope* below.
 
 ## Running it
 
@@ -30,8 +31,9 @@ editor version), then Export Project.
 | Crouch (hold) | Ctrl |
 | Walk slower (hold) | Shift |
 | Fire | Left mouse |
+| Aim down sights / scope | Right mouse (hold, sniper only) |
 | Reload | R |
-| Switch weapon | 1 (rifle) / 2 (pistol) |
+| Switch weapon | 1 Rifle · 2 Pistol · 3 SMG · 4 Sniper · 5 Knife |
 | Start a scored 60s run | T |
 | Release mouse cursor | Esc |
 
@@ -41,31 +43,49 @@ editor version), then Export Project.
   air strafing with a capped wish-speed (the classic bunny-hop trick), so
   momentum carries between jumps instead of movement just being "walk speed
   in any direction."
-- **Two hitscan weapons** (rifle, pistol), each with its own fire rate, a
-  deterministic recoil pattern (same spray every time, so it's learnable —
-  generated procedurally per weapon, not copied from any real game), and an
-  accuracy cone that opens up while moving/spraying and recovers when you
-  stop, mirroring how CS-likes discourage run-and-gun.
-- **Targets**: pop on any hit and respawn a moment later at a random point
-  from their spawn pool. Separate head/body hitboxes score differently.
-  Static targets (red) and side-to-side patrol targets (blue).
-  A hit marker and distinct headshot sound confirm hits.
-  Live stats (score, hit/shot accuracy, streak) plus an optional 60-second
-  timed run (`T`) for a scored sprint.
-- **Everything is built from primitives/code** — level geometry, the
-  weapon viewmodels, targets, and HUD are all generated at runtime from
+- **Five weapons** — Rifle, Pistol, SMG, Sniper, Knife — each with its own
+  fire rate, damage, and a deterministic recoil pattern (same spray every
+  time, so it's learnable — generated procedurally per weapon, not copied
+  from any real game). Accuracy bloom opens up while moving/spraying and
+  recovers when you stop. The sniper has a real ADS zoom (FOV 90°→25°) with
+  near-pinpoint accuracy while scoped; the knife is a short-range instant
+  swing with no ammo.
+- **Enemies, not paper targets**: Terrorist and Spec Ops soldiers built as
+  small procedural rigs (separate head/body hitboxes — headshots always
+  kill, body shots chip a 100 HP pool). They idle, patrol fixed routes, or
+  hold a guard position; once they get line of sight on you within range
+  they turn, open fire with distance-based accuracy, and use the arena's
+  cover the same way you do. Killed enemies topple over and respawn a few
+  seconds later at a random point in their pool.
+- **You can die**: 100 HP, a damage vignette and hit-zone-scaled screen
+  shake feedback, a short "ELIMINATED" pause, then respawn at your start
+  point with full health (streak resets, score doesn't).
+- **Animation, all procedural**: leg/arm walk cycle while patrolling, an
+  aim-raise when an enemy goes hostile, a flinch on non-lethal hits, a
+  tumble-and-sink death tween, and a scale-in on spawn/respawn — plus on
+  the player side, weapon idle sway/bob, a recoil kick, a reload dip, and
+  a rise-up animation when you switch weapons. No hand-authored
+  AnimationPlayer tracks; everything is driven by script.
+- **Scoring**: live stats (score, hit/shot accuracy, streak) plus an
+  optional 60-second timed run (`T`) for a scored sprint. A hit marker and
+  distinct headshot sound confirm hits.
+- **Everything is built from primitives/code** — level geometry, enemy
+  rigs, weapon viewmodels, and HUD are all generated at runtime from
   boxes/capsules/spheres and `Control._draw()`, so there are no external
-  art assets to manage. The 7 `.wav` sound effects (gunshots, reload,
-  hit markers, empty click) are procedurally synthesized (see the "Generated
-  audio" note below) rather than recorded/sourced.
+  art assets to manage. The 13 `.wav` sound effects (gunshots per weapon,
+  reload, hit markers, melee whoosh/impact, pain, body-fall) are
+  procedurally synthesized (see "Generated audio" below) rather than
+  recorded/sourced.
 
 ## Scope (what's deliberately not here)
 
 Multiplayer, bomb-defusal rounds, and buy menus were out of scope for this
-pass — the brief was specifically an aim-training range, not a full CS2
-replica. The movement/weapon/target/scoring systems are decoupled enough
-(`scripts/player`, `scripts/world`, `scripts/ui`) that a round-based game
-mode could be layered on later without reworking the core feel.
+pass. Enemy "accuracy" is a simple distance-based hit-chance roll (not a
+literal raycast against your hitbox) — line of sight to you is still a real
+raycast against the level geometry, so cover genuinely blocks their shots.
+The movement/weapon/enemy/scoring systems are decoupled enough
+(`scripts/player`, `scripts/world`, `scripts/ui`) that round-based modes,
+more factions, or objective types could be layered on later.
 
 ## Project structure
 
@@ -77,20 +97,20 @@ scenes/            -- thin scene roots; almost everything is built in code
   player.tscn
   hud.tscn
 scripts/
-  autoload/         -- Settings (sensitivity/volume), GameState (live stats, run timer)
-  player/           -- player.gd (movement/camera), weapon.gd (fire/recoil/reload)
-  world/            -- range_builder.gd (level), target.gd, target_moving.gd
+  autoload/         -- Settings (sensitivity/volume), GameState (stats, health, run timer)
+  player/           -- player.gd (movement/camera/death), weapon.gd (fire/recoil/reload/ADS/melee)
+  world/            -- range_builder.gd (level + squad placement), enemy.gd (rig/AI/animation)
   ui/                -- hud.gd, crosshair.gd, hitmarker.gd, main_menu.gd
   weapon_stats.gd    -- weapon tuning data (Resource)
-  weapon_presets.gd  -- rifle/pistol factory functions
+  weapon_presets.gd  -- rifle/pistol/smg/sniper/knife factory functions
 audio/              -- procedurally generated .wav sound effects
 ```
 
 ### Generated audio
 
 `audio/*.wav` were synthesized with a small offline Python script (noise
-bursts + envelopes for gunshots/clicks, sine blips for hit markers) —
-placeholders with the right punch/timing rather than final sound design.
-Swap them for your own `.wav` files (keep the filenames, or update the
-paths in `weapon_presets.gd` and `scripts/ui`) whenever you want a real
-audio pass.
+bursts + envelopes for gunshots/impacts, sine blips for hit markers,
+filtered noise sweeps for the knife whoosh) — placeholders with the right
+punch/timing rather than final sound design. Swap them for your own `.wav`
+files (keep the filenames, or update the paths in `weapon_presets.gd` and
+`scripts/world/enemy.gd`) whenever you want a real audio pass.

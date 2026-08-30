@@ -5,8 +5,12 @@ signal target_hit(zone: String, points: int)
 signal stats_reset
 signal run_started
 signal run_finished(final_score: int, final_accuracy: float)
+signal player_damaged(amount: int, health: int)
+signal player_died
+signal player_respawned
 
 const RUN_DURATION := 60.0
+const MAX_HEALTH := 100
 
 var shots_fired: int = 0
 var hits: int = 0
@@ -16,6 +20,9 @@ var best_streak: int = 0
 
 var run_active: bool = false
 var run_time_left: float = 0.0
+
+var health: int = MAX_HEALTH
+var is_dead: bool = false
 
 func _process(delta: float) -> void:
 	if Input.is_action_just_pressed("start_run"):
@@ -38,6 +45,21 @@ func register_hit(zone: String, points: int) -> void:
 
 func register_miss() -> void:
 	streak = 0
+
+func take_damage(amount: int) -> void:
+	if is_dead:
+		return
+	health = max(health - amount, 0)
+	player_damaged.emit(amount, health)
+	if health <= 0:
+		is_dead = true
+		streak = 0
+		player_died.emit()
+
+func respawn() -> void:
+	health = MAX_HEALTH
+	is_dead = false
+	player_respawned.emit()
 
 func get_accuracy() -> float:
 	if shots_fired == 0:

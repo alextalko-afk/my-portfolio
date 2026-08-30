@@ -9,11 +9,19 @@ extends Resource
 
 @export var points_body: int = 10
 @export var points_head: int = 15
+@export var damage_body: int = 34
 
 @export var fire_interval: float = 0.1
 @export var mag_size: int = 30
 @export var reserve_ammo: int = 90
 @export var reload_time: float = 2.5
+
+@export var is_melee: bool = false
+@export var melee_range: float = 2.2
+
+@export var has_ads: bool = false
+@export var ads_fov: float = 55.0
+@export var ads_spread_mult: float = 0.35
 
 @export var spread_base_deg: float = 0.3
 @export var spread_move_penalty_deg: float = 2.2
