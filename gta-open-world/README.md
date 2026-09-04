@@ -151,6 +151,42 @@ running engine:
   surfaces fall back to the engine's default grey material rather than
   crashing, and `ProceduralCityGenerator` prints an on-screen reminder.
 
+## Improving the visuals
+
+The mini-slice above is deliberately built for reliability, not looks —
+it had to work the first time it compiled, with no way to preview it.
+Once you have the editor open, a few steps get real graphical quality
+with very little effort, roughly in order of impact:
+
+1. **Lumen is already on** (`Config/DefaultEngine.ini`): dynamic global
+   illumination and reflections, running in Software mode so it doesn't
+   need a ray-tracing GPU. Since every mesh here is `Movable` (nothing is
+   baked), this is the single highest-impact setting for this project —
+   real bounce light off the procedural city instead of flat ambient.
+2. **Add a Post Process Volume** (unbound, covering the whole level):
+   this is where exposure, bloom intensity, contrast, and a color grade
+   live. Five minutes of sliders here does more for "does this look like
+   a real game" than any of the code.
+3. **Swap the block-out meshes for real ones.** The character, car, and
+   buildings are intentionally primitive shapes (see "Known
+   limitations") because real meshes are editor-authored content this
+   project couldn't produce blind. The free **Quixel Megascans** library
+   (Content Browser → *Add* → *Fab* / *Quixel Bridge*, bundled with
+   UE5, no cost) has ready-to-drop vehicles, building facades, and
+   ground materials — the fastest way to replace `/Engine/BasicShapes/`
+   placeholders with something detailed without hand-modeling anything.
+4. **Give buildings real materials.** `M_Procedural` is one flat,
+   unlit-feeling material reused everywhere. A proper Master Material
+   with normal/roughness inputs (still driven by the same runtime
+   `BaseTexture` parameter if you want to keep facades procedural) reads
+   as far more solid under Lumen lighting than a Base-Color-only material
+   does.
+
+None of this is code - it's exactly the kind of visual, iterative,
+in-editor work that has to happen with eyes on a running build. Once
+you've got it open, screenshots of what you're seeing are the fastest
+way to keep iterating on this together.
+
 ## Project structure
 
 ```
