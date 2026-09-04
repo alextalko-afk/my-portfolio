@@ -29,6 +29,7 @@ static func make_rifle():
 	s.recoil_pattern_length = 24
 	s.muzzle_color = Color(1.0, 0.78, 0.35)
 	s.fire_sound_path = "res://audio/rifle_shot.wav"
+	s.shake_amount = 0.14
 	s._build_recoil_pattern()
 	return s
 
@@ -54,6 +55,7 @@ static func make_pistol():
 	s.recoil_pattern_length = 12
 	s.muzzle_color = Color(1.0, 0.85, 0.5)
 	s.fire_sound_path = "res://audio/pistol_shot.wav"
+	s.shake_amount = 0.09
 	s._build_recoil_pattern()
 	return s
 
@@ -79,6 +81,7 @@ static func make_smg():
 	s.recoil_pattern_length = 20
 	s.muzzle_color = Color(1.0, 0.7, 0.3)
 	s.fire_sound_path = "res://audio/smg_shot.wav"
+	s.shake_amount = 0.11
 	s._build_recoil_pattern()
 	return s
 
@@ -107,6 +110,7 @@ static func make_sniper():
 	s.has_ads = true
 	s.ads_fov = 25.0
 	s.ads_spread_mult = 0.05
+	s.shake_amount = 0.4
 	s._build_recoil_pattern()
 	return s
 
@@ -133,5 +137,6 @@ static func make_knife():
 	s.is_melee = true
 	s.melee_range = 2.2
 	s.fire_sound_path = "res://audio/knife_swing.wav"
+	s.shake_amount = 0.06
 	s._build_recoil_pattern()
 	return s

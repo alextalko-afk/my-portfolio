@@ -63,19 +63,34 @@ editor version), then Export Project.
 - **Animation, all procedural**: leg/arm walk cycle while patrolling, an
   aim-raise when an enemy goes hostile, a flinch on non-lethal hits, a
   tumble-and-sink death tween, and a scale-in on spawn/respawn — plus on
-  the player side, weapon idle sway/bob, a recoil kick, a reload dip, and
-  a rise-up animation when you switch weapons. No hand-authored
-  AnimationPlayer tracks; everything is driven by script.
+  the player side, weapon idle sway/bob, a recoil kick, a reload dip, a
+  rise-up animation when you switch weapons, screen shake scaled per
+  weapon (the sniper kicks hard) and on taking damage, and a camera dip
+  when you land a fall. No hand-authored AnimationPlayer tracks;
+  everything is driven by script.
+- **Visuals**: a real sky + sun/fill lighting pair, SSAO and SSIL contact
+  shadows/bounce light, filmic tonemapping and a touch of bloom (Forward+
+  only — see note below), and every surface (floor, walls, props, camo
+  uniforms, gun metal) carries procedurally generated noise/camo texture
+  instead of a flat color. Muzzle flashes throw sparks, bullets that miss
+  scorch and spark the wall they hit, hits draw blood, and dead enemies
+  kick up a dust puff.
 - **Scoring**: live stats (score, hit/shot accuracy, streak) plus an
   optional 60-second timed run (`T`) for a scored sprint. A hit marker and
   distinct headshot sound confirm hits.
 - **Everything is built from primitives/code** — level geometry, enemy
-  rigs, weapon viewmodels, and HUD are all generated at runtime from
-  boxes/capsules/spheres and `Control._draw()`, so there are no external
-  art assets to manage. The 13 `.wav` sound effects (gunshots per weapon,
-  reload, hit markers, melee whoosh/impact, pain, body-fall) are
+  rigs, weapon viewmodels, HUD, and every texture (noise fields, camo,
+  scorch marks, muzzle glow) are all generated at runtime, so there are no
+  external art assets to manage. The 13 `.wav` sound effects (gunshots per
+  weapon, reload, hit markers, melee whoosh/impact, pain, body-fall) are
   procedurally synthesized (see "Generated audio" below) rather than
   recorded/sourced.
+
+> **Renderer note**: SSAO/SSIL only run on the **Forward+** rendering
+> method (Godot's desktop default, which this project is configured for).
+> If your machine falls back to the Compatibility/Mobile renderer,
+> everything else still works — you just lose those two contact-shadow
+> effects, silently, with no error.
 
 ## Scope (what's deliberately not here)
 
@@ -103,6 +118,7 @@ scripts/
   ui/                -- hud.gd, crosshair.gd, hitmarker.gd, main_menu.gd
   weapon_stats.gd    -- weapon tuning data (Resource)
   weapon_presets.gd  -- rifle/pistol/smg/sniper/knife factory functions
+  world/proc_gfx.gd  -- procedural textures (noise, camo, decals) + particle/decal spawners
 audio/              -- procedurally generated .wav sound effects
 ```
 

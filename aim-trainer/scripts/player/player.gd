@@ -12,6 +12,11 @@ const WeaponPresets := preload("res://scripts/weapon_presets.gd")
 const WEAPON_SLOT_ACTIONS := ["weapon_1", "weapon_2", "weapon_3", "weapon_4", "weapon_5"]
 const RESPAWN_DELAY := 2.5
 
+const SHAKE_DECAY := 3.2
+const SHAKE_MAX_ROT := 0.035
+const LAND_DIP_DECAY := 6.0
+const LAND_DIP_MAX := 0.09
+
 @export var walk_speed: float = 6.0
 @export var crouch_speed: float = 3.0
 @export var slow_walk_speed: float = 2.5
@@ -34,6 +39,9 @@ var is_dead := false
 var _spawn_position: Vector3
 var _spawn_rotation_y: float
 var _audio_hurt: AudioStreamPlayer
+var _shake_trauma: float = 0.0
+var _land_dip: float = 0.0
+var _was_on_floor: bool = true
 
 func _ready() -> void:
 	head.position.y = STAND_HEIGHT
@@ -51,6 +59,10 @@ func _ready() -> void:
 func _on_player_damaged(_amount: int, _health: int) -> void:
 	_audio_hurt.stop()
 	_audio_hurt.play()
+	add_shake(0.45)
+
+func add_shake(amount: float) -> void:
+	_shake_trauma = clamp(_shake_trauma + amount, 0.0, 1.0)
 
 func _on_player_died() -> void:
 	is_dead = true
@@ -161,7 +173,24 @@ func _physics_process(delta: float) -> void:
 	else:
 		_accelerate(wish_dir, min(speed, air_speed_cap), air_accel, delta)
 
+	var fall_speed_before: float = velocity.y
 	move_and_slide()
+
+	if is_on_floor() and not _was_on_floor:
+		_land_dip = clamp(-fall_speed_before / 9.0, 0.0, 1.0) * LAND_DIP_MAX
+	_was_on_floor = is_on_floor()
+
+	_update_camera_fx(delta)
+
+func _update_camera_fx(delta: float) -> void:
+	if _shake_trauma > 0.0:
+		_shake_trauma = max(_shake_trauma - SHAKE_DECAY * delta, 0.0)
+	var t: float = _shake_trauma * _shake_trauma
+	camera.rotation.x = randf_range(-1.0, 1.0) * SHAKE_MAX_ROT * t
+	camera.rotation.z = randf_range(-1.0, 1.0) * SHAKE_MAX_ROT * t
+
+	_land_dip = max(_land_dip - LAND_DIP_DECAY * delta, 0.0)
+	camera.position.y = -_land_dip
 
 func _apply_friction(delta: float) -> void:
 	var speed := Vector2(velocity.x, velocity.z).length()

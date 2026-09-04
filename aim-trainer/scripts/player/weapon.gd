@@ -8,6 +8,8 @@ extends Node3D
 
 signal ammo_changed(mag: int, reserve: int)
 
+const ProcGfx := preload("res://scripts/world/proc_gfx.gd")
+
 const DEFAULT_FOV := 90.0
 const MUZZLE_FLASH_TIME := 0.06
 const DRAW_TIME := 0.22
@@ -43,11 +45,13 @@ var _audio_reload_out: AudioStreamPlayer
 var _audio_reload_in: AudioStreamPlayer
 var _audio_empty: AudioStreamPlayer
 var _audio_melee_hit: AudioStreamPlayer
+var _scorch_tex: ImageTexture
 
 func setup(new_stats, new_player: Node, new_camera: Camera3D) -> void:
 	stats = new_stats
 	player = new_player
 	camera = new_camera
+	_scorch_tex = ProcGfx.make_scorch_texture()
 	mag_ammo = stats.mag_size
 	reserve_ammo = stats.reserve_ammo
 	name = stats.weapon_name
@@ -76,23 +80,54 @@ func get_spread_deg() -> float:
 	return stats.spread_base_deg + _current_bloom if stats else 0.0
 
 func _build_gun_viewmodel() -> void:
+	var metal_mat := _metal_material(Color(0.1, 0.1, 0.11))
+	var poly_mat := ProcGfx.make_noise_material(Color(0.11, 0.11, 0.12), 0.75, 0.1, 3.0)
+
 	var body := MeshInstance3D.new()
 	body.mesh = BoxMesh.new()
 	(body.mesh as BoxMesh).size = Vector3(0.09, 0.11, 0.42)
-	body.material_override = _make_material(Color(0.08, 0.08, 0.09))
+	body.material_override = metal_mat
 	add_child(body)
 
 	var barrel := MeshInstance3D.new()
 	barrel.mesh = BoxMesh.new()
 	(barrel.mesh as BoxMesh).size = Vector3(0.035, 0.035, 0.28)
-	barrel.material_override = _make_material(Color(0.05, 0.05, 0.05))
+	barrel.material_override = metal_mat
 	barrel.position = Vector3(0, 0.015, -0.34)
 	add_child(barrel)
+
+	var foregrip := MeshInstance3D.new()
+	foregrip.mesh = BoxMesh.new()
+	(foregrip.mesh as BoxMesh).size = Vector3(0.05, 0.05, 0.15)
+	foregrip.material_override = poly_mat
+	foregrip.position = Vector3(0, -0.038, -0.27)
+	add_child(foregrip)
+
+	var front_sight := MeshInstance3D.new()
+	front_sight.mesh = BoxMesh.new()
+	(front_sight.mesh as BoxMesh).size = Vector3(0.014, 0.05, 0.014)
+	front_sight.material_override = metal_mat
+	front_sight.position = Vector3(0, 0.065, -0.46)
+	add_child(front_sight)
+
+	var rear_sight := MeshInstance3D.new()
+	rear_sight.mesh = BoxMesh.new()
+	(rear_sight.mesh as BoxMesh).size = Vector3(0.05, 0.025, 0.02)
+	rear_sight.material_override = metal_mat
+	rear_sight.position = Vector3(0, 0.075, 0.12)
+	add_child(rear_sight)
+
+	var trigger_guard := MeshInstance3D.new()
+	trigger_guard.mesh = BoxMesh.new()
+	(trigger_guard.mesh as BoxMesh).size = Vector3(0.05, 0.018, 0.09)
+	trigger_guard.material_override = poly_mat
+	trigger_guard.position = Vector3(0, -0.055, 0.04)
+	add_child(trigger_guard)
 
 	var grip := MeshInstance3D.new()
 	grip.mesh = BoxMesh.new()
 	(grip.mesh as BoxMesh).size = Vector3(0.06, 0.16, 0.06)
-	grip.material_override = _make_material(Color(0.1, 0.1, 0.11))
+	grip.material_override = poly_mat
 	grip.position = Vector3(0, -0.11, 0.08)
 	grip.rotation.x = deg_to_rad(12.0)
 	add_child(grip)
@@ -100,7 +135,7 @@ func _build_gun_viewmodel() -> void:
 	var mag := MeshInstance3D.new()
 	mag.mesh = BoxMesh.new()
 	(mag.mesh as BoxMesh).size = Vector3(0.045, 0.16, 0.06)
-	mag.material_override = _make_material(Color(0.12, 0.12, 0.13))
+	mag.material_override = poly_mat
 	mag.position = Vector3(0, -0.13, -0.06)
 	mag.rotation.x = deg_to_rad(-8.0)
 	add_child(mag)
@@ -108,10 +143,34 @@ func _build_gun_viewmodel() -> void:
 	if stats.has_ads:
 		var scope := MeshInstance3D.new()
 		scope.mesh = BoxMesh.new()
-		(scope.mesh as BoxMesh).size = Vector3(0.04, 0.04, 0.16)
-		scope.material_override = _make_material(Color(0.04, 0.04, 0.04))
-		scope.position = Vector3(0, 0.075, -0.1)
+		(scope.mesh as BoxMesh).size = Vector3(0.045, 0.045, 0.2)
+		scope.material_override = metal_mat
+		scope.position = Vector3(0, 0.08, -0.09)
 		add_child(scope)
+
+		var scope_lens := MeshInstance3D.new()
+		scope_lens.mesh = CylinderMesh.new()
+		var lens := scope_lens.mesh as CylinderMesh
+		lens.top_radius = 0.026
+		lens.bottom_radius = 0.026
+		lens.height = 0.008
+		scope_lens.rotation_degrees = Vector3(90, 0, 0)
+		var lens_mat := StandardMaterial3D.new()
+		lens_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		lens_mat.albedo_color = Color(0.15, 0.55, 0.4)
+		lens_mat.emission_enabled = true
+		lens_mat.emission = Color(0.1, 0.4, 0.3)
+		lens_mat.emission_energy_multiplier = 0.6
+		scope_lens.material_override = lens_mat
+		scope_lens.position = Vector3(0, 0.08, -0.19)
+		add_child(scope_lens)
+	else:
+		var stock := MeshInstance3D.new()
+		stock.mesh = BoxMesh.new()
+		(stock.mesh as BoxMesh).size = Vector3(0.05, 0.06, 0.16)
+		stock.material_override = poly_mat
+		stock.position = Vector3(0, 0.0, 0.27)
+		add_child(stock)
 
 	var muzzle_anchor := Node3D.new()
 	muzzle_anchor.position = Vector3(0, 0.015, -0.48)
@@ -137,31 +196,59 @@ func _build_gun_viewmodel() -> void:
 	muzzle_anchor.add_child(_muzzle_mesh)
 
 func _build_knife_viewmodel() -> void:
+	var handle_mat := ProcGfx.make_noise_material(Color(0.22, 0.16, 0.1), 0.8, 0.14, 6.0)
 	var handle := MeshInstance3D.new()
 	handle.mesh = BoxMesh.new()
 	(handle.mesh as BoxMesh).size = Vector3(0.05, 0.05, 0.16)
-	handle.material_override = _make_material(Color(0.22, 0.16, 0.1))
+	handle.material_override = handle_mat
 	handle.position = Vector3(0, 0, 0.05)
 	add_child(handle)
+
+	var wrap := MeshInstance3D.new()
+	wrap.mesh = CylinderMesh.new()
+	var wrap_cyl := wrap.mesh as CylinderMesh
+	wrap_cyl.top_radius = 0.029
+	wrap_cyl.bottom_radius = 0.029
+	wrap_cyl.height = 0.13
+	wrap.rotation_degrees = Vector3(90, 0, 0)
+	wrap.material_override = ProcGfx.make_noise_material(Color(0.08, 0.08, 0.09), 0.9, 0.2, 8.0)
+	wrap.position = Vector3(0, 0, 0.05)
+	add_child(wrap)
 
 	var guard := MeshInstance3D.new()
 	guard.mesh = BoxMesh.new()
 	(guard.mesh as BoxMesh).size = Vector3(0.1, 0.03, 0.02)
-	guard.material_override = _make_material(Color(0.15, 0.15, 0.16))
+	guard.material_override = _metal_material(Color(0.15, 0.15, 0.16))
 	guard.position = Vector3(0, 0, -0.05)
 	add_child(guard)
 
+	var blade_mat := _metal_material(Color(0.78, 0.8, 0.82))
+	blade_mat.metallic = 0.85
+	blade_mat.roughness = 0.2
 	var blade := MeshInstance3D.new()
 	blade.mesh = BoxMesh.new()
-	(blade.mesh as BoxMesh).size = Vector3(0.025, 0.02, 0.32)
-	blade.material_override = _make_material(Color(0.75, 0.77, 0.8))
+	(blade.mesh as BoxMesh).size = Vector3(0.022, 0.018, 0.32)
+	blade.material_override = blade_mat
 	blade.position = Vector3(0, 0.01, -0.22)
 	add_child(blade)
+
+	var blade_edge := MeshInstance3D.new()
+	blade_edge.mesh = BoxMesh.new()
+	(blade_edge.mesh as BoxMesh).size = Vector3(0.03, 0.004, 0.3)
+	blade_edge.material_override = blade_mat
+	blade_edge.position = Vector3(0, -0.006, -0.22)
+	add_child(blade_edge)
 
 func _make_material(color: Color) -> StandardMaterial3D:
 	var m := StandardMaterial3D.new()
 	m.albedo_color = color
 	m.roughness = 0.65
+	return m
+
+func _metal_material(color: Color) -> StandardMaterial3D:
+	var m := ProcGfx.make_noise_material(color, 0.35, 0.08, 5.0)
+	m.metallic = 0.65
+	m.metallic_specular = 0.6
 	return m
 
 func _build_audio() -> void:
@@ -250,6 +337,8 @@ func _fire() -> void:
 		_raycast_shot(stats.spread_base_deg, stats.melee_range)
 		_audio_fire.stop()
 		_audio_fire.play()
+		if player and player.has_method("add_shake"):
+			player.add_shake(stats.shake_amount)
 		return
 
 	mag_ammo -= 1
@@ -268,6 +357,8 @@ func _fire() -> void:
 	var recoil: Vector2 = stats.get_recoil(_shots_since_rest)
 	if player and player.has_method("apply_recoil"):
 		player.apply_recoil(recoil)
+	if player and player.has_method("add_shake"):
+		player.add_shake(stats.shake_amount)
 	_shots_since_rest += 1
 
 	GameState.register_shot()
@@ -276,6 +367,7 @@ func _fire() -> void:
 	_muzzle_timer = MUZZLE_FLASH_TIME
 	_audio_fire.stop()
 	_audio_fire.play()
+	_spawn_muzzle_spark()
 
 func _raycast_shot(spread_deg: float, max_distance: float) -> void:
 	if not camera:
@@ -292,16 +384,40 @@ func _raycast_shot(spread_deg: float, max_distance: float) -> void:
 		var collider = result.collider
 		if collider.is_in_group("target_head"):
 			collider.get_parent().hit("head", stats.points_head, stats.damage_body)
+			_spawn_blood(result.position, result.normal)
 			if stats.is_melee:
 				_audio_melee_hit.play()
 		elif collider.is_in_group("target_body"):
 			collider.get_parent().hit("body", stats.points_body, stats.damage_body)
+			_spawn_blood(result.position, result.normal)
 			if stats.is_melee:
 				_audio_melee_hit.play()
 		else:
 			GameState.register_miss()
+			_spawn_wall_impact(result.position, result.normal)
 	else:
 		GameState.register_miss()
+
+func _spawn_muzzle_spark() -> void:
+	var scene := get_tree().current_scene
+	if not scene or not camera:
+		return
+	var muzzle_world: Vector3 = global_transform * Vector3(0, 0.015, -0.48)
+	var forward: Vector3 = -camera.global_transform.basis.z
+	ProcGfx.spawn_spark_burst(scene, muzzle_world, forward, stats.muzzle_color, 6)
+
+func _spawn_wall_impact(position: Vector3, normal: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	ProcGfx.spawn_spark_burst(scene, position, normal, Color(1.0, 0.75, 0.35), 8)
+	ProcGfx.spawn_decal(scene, position, normal, _scorch_tex, Vector3(0.16, 0.06, 0.16))
+
+func _spawn_blood(position: Vector3, normal: Vector3) -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	ProcGfx.spawn_spark_burst(scene, position, normal, Color(0.55, 0.05, 0.05), 10)
 
 func _apply_spread(forward: Vector3, spread_deg: float) -> Vector3:
 	if spread_deg <= 0.0:

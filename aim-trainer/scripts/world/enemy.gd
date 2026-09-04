@@ -6,6 +6,8 @@ extends Node3D
 ## flinch, death topple, spawn-in) -- no hand-authored AnimationPlayer
 ## tracks, since those can't be visually tuned without a GUI.
 
+const ProcGfx := preload("res://scripts/world/proc_gfx.gd")
+
 enum Faction { TERRORIST, SPEC_OPS }
 enum State { IDLE, PATROL, ALERT, DEAD }
 
@@ -47,6 +49,7 @@ var _muzzle_timer: float = 0.0
 
 var _muzzle_light: OmniLight3D
 var _muzzle_mesh: MeshInstance3D
+var _muzzle_anchor: Node3D
 var _audio_fire: AudioStreamPlayer3D
 var _audio_death: AudioStreamPlayer3D
 
@@ -66,31 +69,43 @@ func setup(new_faction: int, points: Array, patrol: Array, new_player: Node) -> 
 func _palette() -> Dictionary:
 	if faction == Faction.SPEC_OPS:
 		return {
-			"cloth": Color(0.14, 0.17, 0.22),
-			"armor": Color(0.09, 0.11, 0.14),
-			"head": Color(0.07, 0.08, 0.10),
+			"camo": [Color(0.15, 0.18, 0.23), Color(0.10, 0.12, 0.16), Color(0.19, 0.22, 0.27)],
+			"armor": Color(0.08, 0.09, 0.11),
+			"boots": Color(0.05, 0.05, 0.06),
+			"head": Color(0.58, 0.46, 0.38),
+			"headgear": Color(0.07, 0.08, 0.09),
 		}
 	return {
-		"cloth": Color(0.52, 0.45, 0.30),
-		"armor": Color(0.35, 0.30, 0.20),
-		"head": Color(0.30, 0.24, 0.16),
+		"camo": [Color(0.58, 0.50, 0.34), Color(0.42, 0.36, 0.24), Color(0.50, 0.42, 0.28)],
+		"armor": Color(0.32, 0.26, 0.16),
+		"boots": Color(0.20, 0.15, 0.09),
+		"head": Color(0.62, 0.48, 0.38),
+		"headgear": Color(0.24, 0.19, 0.12),
 	}
 
 func _make_part(parent: Node3D, size: Vector3, color: Color, local_pos: Vector3) -> MeshInstance3D:
+	return _make_part_mat(parent, size, _flat_material(color), local_pos)
+
+func _make_part_mat(parent: Node3D, size: Vector3, material: Material, local_pos: Vector3) -> MeshInstance3D:
 	var mesh_instance := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = size
 	mesh_instance.mesh = box
-	var mat := StandardMaterial3D.new()
-	mat.albedo_color = color
-	mat.roughness = 0.85
-	mesh_instance.material_override = mat
+	mesh_instance.material_override = material
 	mesh_instance.position = local_pos
 	parent.add_child(mesh_instance)
 	return mesh_instance
 
+func _flat_material(color: Color) -> StandardMaterial3D:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_color = color
+	mat.roughness = 0.85
+	return mat
+
 func _build_rig() -> void:
 	var pal := _palette()
+	var cloth_mat := ProcGfx.make_camo_material(pal["camo"], 0.92, 3.0)
+	var armor_mat := ProcGfx.make_noise_material(pal["armor"], 0.55, 0.12, 2.0)
 
 	_hip = Node3D.new()
 	_hip.position = Vector3(0, 0.95, 0)
@@ -99,24 +114,31 @@ func _build_rig() -> void:
 	_left_leg = Node3D.new()
 	_left_leg.position = Vector3(-0.11, 0, 0)
 	_hip.add_child(_left_leg)
-	_make_part(_left_leg, Vector3(0.14, 0.9, 0.16), pal["cloth"], Vector3(0, -0.45, 0))
+	_make_part_mat(_left_leg, Vector3(0.14, 0.9, 0.16), cloth_mat, Vector3(0, -0.45, 0))
+	_make_part(_left_leg, Vector3(0.155, 0.16, 0.19), pal["boots"], Vector3(0, -0.86, 0.01))
 
 	_right_leg = Node3D.new()
 	_right_leg.position = Vector3(0.11, 0, 0)
 	_hip.add_child(_right_leg)
-	_make_part(_right_leg, Vector3(0.14, 0.9, 0.16), pal["cloth"], Vector3(0, -0.45, 0))
+	_make_part_mat(_right_leg, Vector3(0.14, 0.9, 0.16), cloth_mat, Vector3(0, -0.45, 0))
+	_make_part(_right_leg, Vector3(0.155, 0.16, 0.19), pal["boots"], Vector3(0, -0.86, 0.01))
 
-	_torso = _make_part(_hip, Vector3(0.42, 0.62, 0.26), pal["armor"], Vector3(0, 0.36, 0))
+	_torso = _make_part_mat(_hip, Vector3(0.42, 0.62, 0.26), cloth_mat, Vector3(0, 0.36, 0))
+	_make_part_mat(_hip, Vector3(0.34, 0.4, 0.16), armor_mat, Vector3(0, 0.42, 0.07))
+	_make_part(_hip, Vector3(0.1, 0.12, 0.06), Color(0.04, 0.04, 0.04), Vector3(-0.1, 0.3, 0.16))
+	_make_part(_hip, Vector3(0.1, 0.12, 0.06), Color(0.04, 0.04, 0.04), Vector3(0.1, 0.3, 0.16))
+	if patrol_points.size() > 1:
+		_make_part_mat(_hip, Vector3(0.3, 0.34, 0.14), armor_mat, Vector3(0, 0.4, -0.16))
 
 	_left_arm = Node3D.new()
 	_left_arm.position = Vector3(-0.28, 0.58, 0)
 	_hip.add_child(_left_arm)
-	_make_part(_left_arm, Vector3(0.13, 0.55, 0.13), pal["cloth"], Vector3(0, -0.28, 0))
+	_make_part_mat(_left_arm, Vector3(0.13, 0.55, 0.13), cloth_mat, Vector3(0, -0.28, 0))
 
 	_right_arm = Node3D.new()
 	_right_arm.position = Vector3(0.28, 0.58, 0)
 	_hip.add_child(_right_arm)
-	_make_part(_right_arm, Vector3(0.13, 0.55, 0.13), pal["cloth"], Vector3(0, -0.28, 0))
+	_make_part_mat(_right_arm, Vector3(0.13, 0.55, 0.13), cloth_mat, Vector3(0, -0.28, 0))
 	_make_part(_right_arm, Vector3(0.06, 0.06, 0.42), Color(0.05, 0.05, 0.05), Vector3(0.02, -0.5, -0.15))
 
 	var neck := Node3D.new()
@@ -127,14 +149,25 @@ func _build_rig() -> void:
 	sphere.radius = 0.17
 	sphere.height = 0.34
 	head_mesh.mesh = sphere
-	var head_mat := StandardMaterial3D.new()
-	head_mat.albedo_color = pal["head"]
-	head_mesh.material_override = head_mat
+	head_mesh.material_override = _flat_material(pal["head"])
 	neck.add_child(head_mesh)
+
+	if faction == Faction.SPEC_OPS:
+		var helmet := MeshInstance3D.new()
+		var hsphere := SphereMesh.new()
+		hsphere.radius = 0.195
+		hsphere.height = 0.32
+		helmet.mesh = hsphere
+		helmet.material_override = _flat_material(pal["headgear"])
+		helmet.position = Vector3(0, 0.05, -0.01)
+		neck.add_child(helmet)
+	else:
+		_make_part(neck, Vector3(0.32, 0.07, 0.32), pal["headgear"], Vector3(0, 0.1, 0))
 
 	var muzzle_anchor := Node3D.new()
 	muzzle_anchor.position = Vector3(0.02, -0.72, -0.36)
 	_right_arm.add_child(muzzle_anchor)
+	_muzzle_anchor = muzzle_anchor
 
 	_muzzle_light = OmniLight3D.new()
 	_muzzle_light.light_color = Color(1.0, 0.8, 0.4)
@@ -225,6 +258,13 @@ func _play_death_tween() -> void:
 	tw.tween_property(self, "rotation:x", fall.y * 1.3, 0.35)
 	tw.parallel().tween_property(self, "rotation:z", fall.x * 1.3, 0.35)
 	tw.parallel().tween_property(self, "position:y", position.y - 0.4, 0.35)
+	tw.tween_callback(_spawn_death_dust)
+
+func _spawn_death_dust() -> void:
+	var scene := get_tree().current_scene
+	if not scene:
+		return
+	ProcGfx.spawn_spark_burst(scene, global_position + Vector3(0, 0.1, 0), Vector3.UP, Color(0.55, 0.5, 0.42, 0.6), 10)
 
 func _respawn() -> void:
 	if spawn_points.size() > 0:
@@ -307,10 +347,18 @@ func _try_fire(delta: float) -> void:
 	_fire_cooldown = randf_range(FIRE_INTERVAL_MIN, FIRE_INTERVAL_MAX)
 	_muzzle_timer = MUZZLE_FLASH_TIME
 	_audio_fire.play()
+	_spawn_muzzle_spark()
 	var dist: float = global_position.distance_to(player.global_position)
 	var hit_chance: float = clamp(1.0 - (dist / MAX_EFFECTIVE_RANGE), 0.15, 0.85)
 	if randf() < hit_chance:
 		GameState.take_damage(DAMAGE_PER_HIT)
+
+func _spawn_muzzle_spark() -> void:
+	var scene := get_tree().current_scene
+	if not scene or not _muzzle_anchor:
+		return
+	var dir: Vector3 = -_muzzle_anchor.global_transform.basis.z
+	ProcGfx.spawn_spark_burst(scene, _muzzle_anchor.global_position, dir, Color(1.0, 0.8, 0.4), 5)
 
 func _update_muzzle_flash(delta: float) -> void:
 	var mat := _muzzle_mesh.material_override as StandardMaterial3D

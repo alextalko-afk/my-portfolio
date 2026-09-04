@@ -36,6 +36,7 @@ extends Resource
 
 @export var muzzle_color: Color = Color(1.0, 0.75, 0.35)
 @export var fire_sound_path: String = "res://audio/rifle_shot.wav"
+@export var shake_amount: float = 0.12
 
 var recoil_pattern: Array = []
 
