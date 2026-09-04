@@ -31,7 +31,7 @@ var _current_bloom: float = 0.0
 var _reload_timer: float = 0.0
 var _empty_click_latch: bool = false
 
-var _base_local_pos: Vector3 = Vector3(0.32, -0.28, -0.55)
+var _base_local_pos: Vector3 = Vector3(0.28, -0.24, -0.68)
 var _bob_time: float = 0.0
 var _recoil_kick: float = 0.0
 var _muzzle_timer: float = 0.0
@@ -80,8 +80,8 @@ func get_spread_deg() -> float:
 	return stats.spread_base_deg + _current_bloom if stats else 0.0
 
 func _build_gun_viewmodel() -> void:
-	var metal_mat := _metal_material(Color(0.1, 0.1, 0.11))
-	var poly_mat := ProcGfx.make_noise_material(Color(0.11, 0.11, 0.12), 0.75, 0.1, 3.0)
+	var metal_mat := _metal_material(Color(0.13, 0.14, 0.16))
+	var poly_mat := ProcGfx.make_noise_material(Color(0.20, 0.17, 0.13), 0.8, 0.14, 3.0)
 
 	var body := MeshInstance3D.new()
 	body.mesh = BoxMesh.new()
@@ -167,9 +167,9 @@ func _build_gun_viewmodel() -> void:
 	else:
 		var stock := MeshInstance3D.new()
 		stock.mesh = BoxMesh.new()
-		(stock.mesh as BoxMesh).size = Vector3(0.05, 0.06, 0.16)
+		(stock.mesh as BoxMesh).size = Vector3(0.05, 0.06, 0.15)
 		stock.material_override = poly_mat
-		stock.position = Vector3(0, 0.0, 0.27)
+		stock.position = Vector3(0, 0.0, 0.10)
 		add_child(stock)
 
 	var muzzle_anchor := Node3D.new()

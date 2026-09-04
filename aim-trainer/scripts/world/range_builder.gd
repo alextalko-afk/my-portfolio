@@ -73,6 +73,7 @@ func _build_lighting() -> void:
 	fill.light_energy = 0.22
 	fill.light_color = Color(0.65, 0.72, 0.85)
 	fill.shadow_enabled = false
+	fill.sky_mode = DirectionalLight3D.SKY_MODE_LIGHT_ONLY
 	add_child(fill)
 
 func _build_room() -> void:

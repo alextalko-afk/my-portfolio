@@ -69,18 +69,20 @@ func setup(new_faction: int, points: Array, patrol: Array, new_player: Node) -> 
 func _palette() -> Dictionary:
 	if faction == Faction.SPEC_OPS:
 		return {
-			"camo": [Color(0.15, 0.18, 0.23), Color(0.10, 0.12, 0.16), Color(0.19, 0.22, 0.27)],
-			"armor": Color(0.08, 0.09, 0.11),
+			"camo": [Color(0.16, 0.19, 0.24), Color(0.10, 0.12, 0.16), Color(0.21, 0.24, 0.29)],
+			"armor": Color(0.09, 0.10, 0.12),
 			"boots": Color(0.05, 0.05, 0.06),
 			"head": Color(0.58, 0.46, 0.38),
-			"headgear": Color(0.07, 0.08, 0.09),
+			"headgear": Color(0.08, 0.09, 0.10),
+			"patch": Color(0.16, 0.42, 0.85),
 		}
 	return {
-		"camo": [Color(0.58, 0.50, 0.34), Color(0.42, 0.36, 0.24), Color(0.50, 0.42, 0.28)],
-		"armor": Color(0.32, 0.26, 0.16),
+		"camo": [Color(0.60, 0.52, 0.35), Color(0.44, 0.37, 0.25), Color(0.52, 0.44, 0.29)],
+		"armor": Color(0.33, 0.27, 0.17),
 		"boots": Color(0.20, 0.15, 0.09),
 		"head": Color(0.62, 0.48, 0.38),
-		"headgear": Color(0.24, 0.19, 0.12),
+		"headgear": Color(0.25, 0.20, 0.13),
+		"patch": Color(0.80, 0.18, 0.13),
 	}
 
 func _make_part(parent: Node3D, size: Vector3, color: Color, local_pos: Vector3) -> MeshInstance3D:
@@ -101,6 +103,9 @@ func _flat_material(color: Color) -> StandardMaterial3D:
 	mat.albedo_color = color
 	mat.roughness = 0.85
 	return mat
+
+func _metal_color() -> Color:
+	return Color(0.24, 0.24, 0.26)
 
 func _build_rig() -> void:
 	var pal := _palette()
@@ -134,20 +139,21 @@ func _build_rig() -> void:
 	_left_arm.position = Vector3(-0.28, 0.58, 0)
 	_hip.add_child(_left_arm)
 	_make_part_mat(_left_arm, Vector3(0.13, 0.55, 0.13), cloth_mat, Vector3(0, -0.28, 0))
+	_make_part(_left_arm, Vector3(0.14, 0.09, 0.03), pal["patch"], Vector3(0, -0.1, 0.065))
 
 	_right_arm = Node3D.new()
 	_right_arm.position = Vector3(0.28, 0.58, 0)
 	_hip.add_child(_right_arm)
 	_make_part_mat(_right_arm, Vector3(0.13, 0.55, 0.13), cloth_mat, Vector3(0, -0.28, 0))
-	_make_part(_right_arm, Vector3(0.06, 0.06, 0.42), Color(0.05, 0.05, 0.05), Vector3(0.02, -0.5, -0.15))
+	_make_part(_right_arm, Vector3(0.075, 0.075, 0.46), _metal_color(), Vector3(0.02, -0.5, -0.16))
 
 	var neck := Node3D.new()
 	neck.position = Vector3(0, 0.7, 0)
 	_hip.add_child(neck)
 	var head_mesh := MeshInstance3D.new()
 	var sphere := SphereMesh.new()
-	sphere.radius = 0.17
-	sphere.height = 0.34
+	sphere.radius = 0.185
+	sphere.height = 0.37
 	head_mesh.mesh = sphere
 	head_mesh.material_override = _flat_material(pal["head"])
 	neck.add_child(head_mesh)
@@ -155,14 +161,16 @@ func _build_rig() -> void:
 	if faction == Faction.SPEC_OPS:
 		var helmet := MeshInstance3D.new()
 		var hsphere := SphereMesh.new()
-		hsphere.radius = 0.195
-		hsphere.height = 0.32
+		hsphere.radius = 0.215
+		hsphere.height = 0.36
 		helmet.mesh = hsphere
 		helmet.material_override = _flat_material(pal["headgear"])
 		helmet.position = Vector3(0, 0.05, -0.01)
 		neck.add_child(helmet)
+		_make_part(neck, Vector3(0.05, 0.05, 0.05), pal["patch"], Vector3(0, 0.16, -0.16))
 	else:
-		_make_part(neck, Vector3(0.32, 0.07, 0.32), pal["headgear"], Vector3(0, 0.1, 0))
+		_make_part(neck, Vector3(0.34, 0.075, 0.34), pal["headgear"], Vector3(0, 0.11, 0))
+		_make_part(neck, Vector3(0.06, 0.03, 0.06), pal["patch"], Vector3(0, 0.15, 0.05))
 
 	var muzzle_anchor := Node3D.new()
 	muzzle_anchor.position = Vector3(0.02, -0.72, -0.36)
