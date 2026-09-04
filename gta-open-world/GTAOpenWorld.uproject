@@ -1,0 +1,19 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.3",
+	"Category": "",
+	"Description": "Code-first GTA-inspired open world prototype: procedural city, arcade driving, on-foot character. Everything is generated at runtime from C++ - no hand-authored levels, meshes, or materials beyond the two one-time editor steps in README.md.",
+	"Modules": [
+		{
+			"Name": "GTAOpenWorld",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "ProceduralMeshComponent",
+			"Enabled": true
+		}
+	]
+}
