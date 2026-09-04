@@ -1,0 +1,16 @@
+# Unreal Engine generated/build folders - regenerated locally, never commit
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Build/
+.vs/
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.VC.opendb
+
+# The empty level + procedural material created per README's one-time setup
+# are small and fine to commit once you've made them - nothing to ignore there.
