@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Alex Talko — Разработчик</title>
+<meta name="description" content="Портфолио разработчика: проекты, навыки, опыт и контакты.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="cursor-glow" id="cursorGlow"></div>
+
+<header class="site-header" id="siteHeader">
+  <nav class="nav container">
+    <a href="#top" class="logo">AT<span class="dot">.</span></a>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#about">Обо мне</a></li>
+      <li><a href="#skills">Навыки</a></li>
+      <li><a href="#projects">Проекты</a></li>
+      <li><a href="#experience">Опыт</a></li>
+      <li><a href="#contact">Контакты</a></li>
+    </ul>
+    <div class="nav-actions">
+      <button class="theme-toggle" id="themeToggle" aria-label="Переключить тему">
+        <svg id="iconSun" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
+        <svg id="iconMoon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8Z"/></svg>
+      </button>
+      <button class="burger" id="burger" aria-label="Меню"><span></span><span></span><span></span></button>
+    </div>
+  </nav>
+</header>
+
+<main id="top">
+
+  <section class="hero container">
+    <div class="hero-badge reveal">👋 Открыт для новых проектов</div>
+    <h1 class="hero-title reveal">
+      Привет, я <span class="gradient-text">Alex Talko</span><br>
+      создаю игры и веб&#8209;продукты
+    </h1>
+    <p class="hero-sub reveal">
+      Разработчик полного цикла: геймдев на Godot, интерактивные веб-интерфейсы
+      и продуманные пользовательские сценарии — от идеи до релиза.
+    </p>
+    <div class="hero-actions reveal">
+      <a href="#projects" class="btn btn-primary">Смотреть проекты</a>
+      <a href="#contact" class="btn btn-ghost">Связаться</a>
+    </div>
+    <div class="hero-stats reveal">
+      <div class="stat"><span class="stat-num" data-count="4">0</span><span class="stat-label">года опыта</span></div>
+      <div class="stat"><span class="stat-num" data-count="12">0</span><span class="stat-label">проектов</span></div>
+      <div class="stat"><span class="stat-num" data-count="100" data-suffix="%">0</span><span class="stat-label">вовлечённость</span></div>
+    </div>
+  </section>
+
+  <section class="marquee" aria-hidden="true">
+    <div class="marquee-track">
+      <span>GODOT ENGINE</span><span>•</span><span>JAVASCRIPT</span><span>•</span><span>GDSCRIPT</span><span>•</span>
+      <span>PYTHON</span><span>•</span><span>GIT</span><span>•</span><span>UI/UX</span><span>•</span>
+      <span>GODOT ENGINE</span><span>•</span><span>JAVASCRIPT</span><span>•</span><span>GDSCRIPT</span><span>•</span>
+      <span>PYTHON</span><span>•</span><span>GIT</span><span>•</span><span>UI/UX</span><span>•</span>
+    </div>
+  </section>
+
+  <section id="about" class="about container">
+    <div class="section-head reveal">
+      <span class="section-tag">01 — Обо мне</span>
+      <h2>Немного о том, чем я занимаюсь</h2>
+    </div>
+    <div class="about-grid">
+      <p class="about-text reveal">
+        Я разрабатываю игры и веб-приложения, уделяя особое внимание отзывчивости интерфейса,
+        плавной анимации и чистой архитектуре кода. Последний крупный проект — тренажёр
+        точности прицеливания на Godot с процедурной генерацией уровней, системой оружия
+        и полноценным звуковым дизайном. Мне нравится доводить продукт до состояния,
+        когда каждая деталь ощущается «правильной».
+      </p>
+      <div class="about-cards">
+        <div class="about-card reveal">
+          <h3>🎮 Геймдев</h3>
+          <p>Godot Engine, GDScript, игровая физика, левел-дизайн, звук и HUD.</p>
+        </div>
+        <div class="about-card reveal">
+          <h3>🌐 Веб</h3>
+          <p>Семантичный HTML, современный CSS, чистый JavaScript без лишних зависимостей.</p>
+        </div>
+        <div class="about-card reveal">
+          <h3>⚙️ Инструменты</h3>
+          <p>Git, автоматизация сборки, дизайн-системы, адаптивная вёрстка.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="skills" class="skills container">
+    <div class="section-head reveal">
+      <span class="section-tag">02 — Навыки</span>
+      <h2>С чем я работаю каждый день</h2>
+    </div>
+    <div class="skills-grid">
+      <div class="skill-bar reveal" data-level="90">
+        <div class="skill-top"><span>GDScript / Godot</span><span class="skill-pct">90%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+      <div class="skill-bar reveal" data-level="85">
+        <div class="skill-top"><span>JavaScript</span><span class="skill-pct">85%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+      <div class="skill-bar reveal" data-level="80">
+        <div class="skill-top"><span>HTML / CSS</span><span class="skill-pct">80%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+      <div class="skill-bar reveal" data-level="70">
+        <div class="skill-top"><span>Python</span><span class="skill-pct">70%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+      <div class="skill-bar reveal" data-level="75">
+        <div class="skill-top"><span>Game / Level Design</span><span class="skill-pct">75%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+      <div class="skill-bar reveal" data-level="65">
+        <div class="skill-top"><span>Sound Design</span><span class="skill-pct">65%</span></div>
+        <div class="skill-track"><div class="skill-fill"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="projects" class="projects container">
+    <div class="section-head reveal">
+      <span class="section-tag">03 — Проекты</span>
+      <h2>Избранные работы</h2>
+    </div>
+    <div class="projects-grid">
+      <article class="project-card reveal featured">
+        <div class="project-media" aria-hidden="true">
+          <div class="project-glow"></div>
+          <span class="project-emoji">🎯</span>
+        </div>
+        <div class="project-body">
+          <span class="project-tag">Godot · GDScript</span>
+          <h3>Aim Trainer</h3>
+          <p>Тренажёр точности прицеливания в стиле CS2: процедурная арена, система
+            оружия (пистолет, СМГ, снайперка, нож), хитмаркеры, звук и настраиваемый HUD.</p>
+          <div class="project-tech">
+            <span>Godot Engine</span><span>GDScript</span><span>Sound Design</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="project-card reveal">
+        <div class="project-media" aria-hidden="true">
+          <div class="project-glow alt"></div>
+          <span class="project-emoji">📊</span>
+        </div>
+        <div class="project-body">
+          <span class="project-tag">Web App</span>
+          <h3>Дашборд аналитики</h3>
+          <p>Интерактивные графики в реальном времени, фильтры и адаптивная сетка
+            виджетов для отслеживания метрик продукта.</p>
+          <div class="project-tech">
+            <span>JavaScript</span><span>CSS Grid</span><span>REST API</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="project-card reveal">
+        <div class="project-media" aria-hidden="true">
+          <div class="project-glow"></div>
+          <span class="project-emoji">🛒</span>
+        </div>
+        <div class="project-body">
+          <span class="project-tag">Web App</span>
+          <h3>Витрина интернет-магазина</h3>
+          <p>Каталог товаров с фильтрацией, корзиной и анимированными переходами
+            между страницами без перезагрузки.</p>
+          <div class="project-tech">
+            <span>HTML5</span><span>CSS Animations</span><span>LocalStorage</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section id="experience" class="experience container">
+    <div class="section-head reveal">
+      <span class="section-tag">04 — Опыт</span>
+      <h2>Профессиональный путь</h2>
+    </div>
+    <div class="timeline">
+      <div class="timeline-item reveal">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <span class="timeline-date">2024 — сейчас</span>
+          <h3>Game & Web Developer, Freelance</h3>
+          <p>Разработка игровых прототипов на Godot и веб-интерфейсов для клиентов
+            малого и среднего бизнеса.</p>
+        </div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <span class="timeline-date">2022 — 2024</span>
+          <h3>Frontend Developer</h3>
+          <p>Вёрстка и интерактив для маркетинговых лендингов, оптимизация
+            производительности и доступности.</p>
+        </div>
+      </div>
+      <div class="timeline-item reveal">
+        <div class="timeline-dot"></div>
+        <div class="timeline-content">
+          <span class="timeline-date">2021 — 2022</span>
+          <h3>Junior Developer</h3>
+          <p>Первые коммерческие проекты, знакомство с командной разработкой
+            и системами контроля версий.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="contact" class="contact container">
+    <div class="section-head reveal">
+      <span class="section-tag">05 — Контакты</span>
+      <h2>Давайте сделаем что-нибудь вместе</h2>
+    </div>
+    <div class="contact-grid">
+      <div class="contact-info reveal">
+        <p>Есть идея проекта или предложение о сотрудничестве? Напишите — отвечаю быстро.</p>
+        <ul class="contact-list">
+          <li><span>✉️</span><a href="mailto:hello@alextalko.dev">hello@alextalko.dev</a></li>
+          <li><span>📍</span><span>Удалённо, готов к релокации</span></li>
+          <li><span>🔗</span><a href="#" onclick="return false;">github.com/alextalko-afk</a></li>
+        </ul>
+      </div>
+      <form class="contact-form reveal" id="contactForm" novalidate>
+        <div class="form-row">
+          <div class="field">
+            <input type="text" id="name" name="name" placeholder=" " required>
+            <label for="name">Имя</label>
+            <span class="field-error" id="nameError"></span>
+          </div>
+          <div class="field">
+            <input type="email" id="email" name="email" placeholder=" " required>
+            <label for="email">Email</label>
+            <span class="field-error" id="emailError"></span>
+          </div>
+        </div>
+        <div class="field">
+          <textarea id="message" name="message" rows="5" placeholder=" " required></textarea>
+          <label for="message">Сообщение</label>
+          <span class="field-error" id="messageError"></span>
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">
+          <span id="submitText">Отправить сообщение</span>
+        </button>
+        <p class="form-status" id="formStatus" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <a href="#top" class="logo">AT<span class="dot">.</span></a>
+    <p>© <span id="year"></span> Alex Talko. Сделано с любовью к деталям.</p>
+    <button class="to-top" id="toTop" aria-label="Наверх">↑</button>
+  </div>
+</footer>
+
+<script src="script.js"></script>
+</body>
+</html>
