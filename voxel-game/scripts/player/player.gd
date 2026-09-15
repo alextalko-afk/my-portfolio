@@ -71,6 +71,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif event.is_action_pressed("place_block"):
 		_place_targeted_block()
 
+func get_world() -> VoxelWorld:
+	return _world
+
 func _toggle_inventory() -> void:
 	if _hud == null:
 		return
@@ -149,6 +152,9 @@ func _place_targeted_block() -> void:
 		return
 	var held: Dictionary = inventory.get_slot(selected_slot)
 	if held["id"] == BlockRegistry.AIR_ID or held["count"] <= 0:
+		return
+	var held_block: BlockType = BlockRegistry.get_block(held["id"])
+	if held_block == null or not held_block.is_placeable:
 		return
 	var hit: Dictionary = _raycast_block()
 	if hit.is_empty():

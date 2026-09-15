@@ -12,3 +12,6 @@ extends Resource
 @export var is_solid: bool = true
 @export var hardness: float = 1.0
 @export var drop_item: String = ""
+## False for inventory-only items (sticks, tools) that exist for crafting
+## but were never meant to be placed as a world voxel.
+@export var is_placeable: bool = true

@@ -25,6 +25,11 @@ var noise: FastNoiseLite = FastNoiseLite.new()
 var _grass_id: int = 0
 var _dirt_id: int = 0
 var _stone_id: int = 0
+var _workbench_id: int = 0
+
+## World positions currently holding a workbench block, so crafting can
+## check proximity in O(number of workbenches) instead of scanning blocks.
+var _workbench_positions: Dictionary = {}
 
 var _player: Node3D
 var _last_player_chunk: Vector2i = Vector2i(999999, 999999)
@@ -41,9 +46,17 @@ func _ready() -> void:
 	_grass_id = BlockRegistry.get_id_by_name("grass")
 	_dirt_id = BlockRegistry.get_id_by_name("dirt")
 	_stone_id = BlockRegistry.get_id_by_name("stone")
+	_workbench_id = BlockRegistry.get_id_by_name("workbench")
 
 	if player_path != NodePath():
 		_player = get_node(player_path)
+
+func is_near_workbench(world_pos: Vector3, radius: float) -> bool:
+	for pos in _workbench_positions:
+		var block_center: Vector3 = Vector3(pos) + Vector3(0.5, 0.5, 0.5)
+		if world_pos.distance_to(block_center) <= radius:
+			return true
+	return false
 
 func _process(_delta: float) -> void:
 	if _player == null:
@@ -105,11 +118,18 @@ func set_block_world(world_x: int, world_y: int, world_z: int, id: int) -> bool:
 
 	var local_x: int = world_x - coord.x * Chunk.SIZE_X
 	var local_z: int = world_z - coord.y * Chunk.SIZE_Z
+	var previous_id: int = chunk.get_block_local(local_x, world_y, local_z)
 	chunk.set_block_local(local_x, world_y, local_z, id)
 
 	_chunks_mutex.lock()
 	_chunk_blocks[coord] = chunk.blocks
 	_chunks_mutex.unlock()
+
+	var world_pos := Vector3i(world_x, world_y, world_z)
+	if id == _workbench_id and previous_id != _workbench_id:
+		_workbench_positions[world_pos] = true
+	elif id != _workbench_id and previous_id == _workbench_id:
+		_workbench_positions.erase(world_pos)
 
 	_request_rebuild(coord)
 	if local_x == 0:

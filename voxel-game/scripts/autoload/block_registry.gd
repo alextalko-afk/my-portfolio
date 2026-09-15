@@ -15,6 +15,11 @@ const TILE_LEAVES := 6
 const TILE_SAND := 7
 const TILE_PLANKS := 8
 const TILE_COBBLESTONE := 9
+const TILE_WORKBENCH_TOP := 10
+const TILE_WORKBENCH_SIDE := 11
+const TILE_STICK := 12
+const TILE_WOOD_TOOL := 13
+const TILE_STONE_TOOL := 14
 
 var blocks: Array[BlockType] = []
 var atlas_texture: ImageTexture
@@ -180,6 +185,83 @@ func _register_blocks() -> void:
 	cobblestone.drop_item = "cobblestone"
 	register_block(cobblestone)
 
+	var workbench := BlockType.new()
+	workbench.id = 9
+	workbench.block_name = "workbench"
+	workbench.texture_top = TILE_WORKBENCH_TOP
+	workbench.texture_side = TILE_WORKBENCH_SIDE
+	workbench.texture_bottom = TILE_PLANKS
+	workbench.is_transparent = false
+	workbench.is_solid = true
+	workbench.hardness = 2.0
+	workbench.drop_item = "workbench"
+	register_block(workbench)
+
+	var stick := BlockType.new()
+	stick.id = 10
+	stick.block_name = "stick"
+	stick.texture_top = TILE_STICK
+	stick.texture_side = TILE_STICK
+	stick.texture_bottom = TILE_STICK
+	stick.is_transparent = true
+	stick.is_solid = false
+	stick.is_placeable = false
+	stick.hardness = 0.0
+	stick.drop_item = ""
+	register_block(stick)
+
+	var wooden_pickaxe := BlockType.new()
+	wooden_pickaxe.id = 11
+	wooden_pickaxe.block_name = "wooden_pickaxe"
+	wooden_pickaxe.texture_top = TILE_WOOD_TOOL
+	wooden_pickaxe.texture_side = TILE_WOOD_TOOL
+	wooden_pickaxe.texture_bottom = TILE_WOOD_TOOL
+	wooden_pickaxe.is_transparent = true
+	wooden_pickaxe.is_solid = false
+	wooden_pickaxe.is_placeable = false
+	wooden_pickaxe.hardness = 0.0
+	wooden_pickaxe.drop_item = ""
+	register_block(wooden_pickaxe)
+
+	var wooden_axe := BlockType.new()
+	wooden_axe.id = 12
+	wooden_axe.block_name = "wooden_axe"
+	wooden_axe.texture_top = TILE_WOOD_TOOL
+	wooden_axe.texture_side = TILE_WOOD_TOOL
+	wooden_axe.texture_bottom = TILE_WOOD_TOOL
+	wooden_axe.is_transparent = true
+	wooden_axe.is_solid = false
+	wooden_axe.is_placeable = false
+	wooden_axe.hardness = 0.0
+	wooden_axe.drop_item = ""
+	register_block(wooden_axe)
+
+	var wooden_sword := BlockType.new()
+	wooden_sword.id = 13
+	wooden_sword.block_name = "wooden_sword"
+	wooden_sword.texture_top = TILE_WOOD_TOOL
+	wooden_sword.texture_side = TILE_WOOD_TOOL
+	wooden_sword.texture_bottom = TILE_WOOD_TOOL
+	wooden_sword.is_transparent = true
+	wooden_sword.is_solid = false
+	wooden_sword.is_placeable = false
+	wooden_sword.hardness = 0.0
+	wooden_sword.drop_item = ""
+	register_block(wooden_sword)
+
+	var stone_pickaxe := BlockType.new()
+	stone_pickaxe.id = 14
+	stone_pickaxe.block_name = "stone_pickaxe"
+	stone_pickaxe.texture_top = TILE_STONE_TOOL
+	stone_pickaxe.texture_side = TILE_STONE_TOOL
+	stone_pickaxe.texture_bottom = TILE_STONE_TOOL
+	stone_pickaxe.is_transparent = true
+	stone_pickaxe.is_solid = false
+	stone_pickaxe.is_placeable = false
+	stone_pickaxe.hardness = 0.0
+	stone_pickaxe.drop_item = ""
+	register_block(stone_pickaxe)
+
 func _build_atlas() -> void:
 	var image: Image = TextureAtlasBuilder.build_atlas_image()
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_DIRT, Color(0.42, 0.28, 0.16), 0.18)
@@ -192,6 +274,11 @@ func _build_atlas() -> void:
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_SAND, Color(0.82, 0.74, 0.5), 0.12)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_PLANKS, Color(0.68, 0.5, 0.28), 0.14)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_COBBLESTONE, Color(0.45, 0.45, 0.47), 0.22)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_WORKBENCH_TOP, Color(0.58, 0.36, 0.18), 0.16)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_WORKBENCH_SIDE, Color(0.5, 0.32, 0.16), 0.18)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_STICK, Color(0.6, 0.46, 0.26), 0.2)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_WOOD_TOOL, Color(0.66, 0.48, 0.26), 0.18)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_STONE_TOOL, Color(0.55, 0.55, 0.58), 0.16)
 	atlas_texture = ImageTexture.create_from_image(image)
 
 func _build_material() -> void:

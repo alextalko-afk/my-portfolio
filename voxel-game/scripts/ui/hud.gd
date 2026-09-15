@@ -18,6 +18,7 @@ var _debug_label: Label
 var _hotbar_slots: Array = []
 var _inventory_screen: Control
 var _inventory_slots: Array = []
+var _craft_rows: Array = []  # [{recipe, button, label}]
 
 func _ready() -> void:
 	layer = 10
@@ -41,6 +42,8 @@ func _process(_delta: float) -> void:
 		_player.selected_slot + 1,
 	]
 	_refresh_hotbar_selection()
+	if _inventory_screen.visible:
+		_refresh_crafting()
 
 func toggle_inventory() -> void:
 	_inventory_screen.visible = not _inventory_screen.visible
@@ -104,17 +107,23 @@ func _build_inventory_screen() -> void:
 
 	var grid_width: int = INVENTORY_COLS * SLOT_SIZE + (INVENTORY_COLS - 1) * SLOT_SEP
 	var grid_height: int = INVENTORY_ROWS * SLOT_SIZE + (INVENTORY_ROWS - 1) * SLOT_SEP
+	var craft_panel_width: int = 260
+
+	var row := HBoxContainer.new()
+	row.anchor_left = 0.5
+	row.anchor_right = 0.5
+	row.anchor_top = 0.5
+	row.anchor_bottom = 0.5
+	row.offset_left = -(grid_width + craft_panel_width + 24) / 2.0
+	row.offset_right = (grid_width + craft_panel_width + 24) / 2.0
+	row.offset_top = -grid_height / 2.0 - 12
+	row.offset_bottom = grid_height / 2.0 + 12
+	row.add_theme_constant_override("separation", 24)
+	_inventory_screen.add_child(row)
 
 	var panel := PanelContainer.new()
-	panel.anchor_left = 0.5
-	panel.anchor_right = 0.5
-	panel.anchor_top = 0.5
-	panel.anchor_bottom = 0.5
-	panel.offset_left = -grid_width / 2.0 - 12
-	panel.offset_right = grid_width / 2.0 + 12
-	panel.offset_top = -grid_height / 2.0 - 12
-	panel.offset_bottom = grid_height / 2.0 + 12
-	_inventory_screen.add_child(panel)
+	panel.custom_minimum_size = Vector2(grid_width + 24, grid_height + 24)
+	row.add_child(panel)
 
 	var grid := GridContainer.new()
 	grid.columns = INVENTORY_COLS
@@ -129,7 +138,48 @@ func _build_inventory_screen() -> void:
 		grid.add_child(slot)
 		_inventory_slots.append(slot)
 
+	_build_crafting_panel(row, craft_panel_width, grid_height)
+
 	add_child(_inventory_screen)
+
+## Recipes listed as rows (shapeless: quantities only, no grid shape) — a
+## crafting grid's actual positions don't matter for matching, so a list
+## covers the same functionality with much simpler, more robust UI.
+func _build_crafting_panel(parent: Control, panel_width: int, panel_height: int) -> void:
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(panel_width, panel_height)
+	parent.add_child(panel)
+
+	var scroll := ScrollContainer.new()
+	panel.add_child(scroll)
+
+	var list := VBoxContainer.new()
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	list.add_theme_constant_override("separation", 6)
+	scroll.add_child(list)
+
+	for recipe in RecipeRegistry.recipes:
+		var recipe_row := HBoxContainer.new()
+
+		var icon := TextureRect.new()
+		icon.custom_minimum_size = Vector2(28, 28)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_SCALE
+		icon.texture = BlockRegistry.get_icon_texture(BlockRegistry.get_id_by_name(recipe.output_name))
+		recipe_row.add_child(icon)
+
+		var label := Label.new()
+		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		recipe_row.add_child(label)
+
+		var craft_button := Button.new()
+		craft_button.text = "Craft"
+		craft_button.focus_mode = Control.FOCUS_NONE
+		craft_button.pressed.connect(_on_craft_pressed.bind(recipe))
+		recipe_row.add_child(craft_button)
+
+		list.add_child(recipe_row)
+		_craft_rows.append({"recipe": recipe, "button": craft_button, "label": label})
 
 func _make_slot_panel() -> Panel:
 	var panel := Panel.new()
@@ -157,6 +207,41 @@ func _on_inventory_slot_pressed(index: int) -> void:
 	if _player == null:
 		return
 	_player.inventory.swap_slots(index, _player.selected_slot)
+
+func _on_craft_pressed(recipe: Recipe) -> void:
+	if _player == null:
+		return
+	var near_bench: bool = _world_near_workbench()
+	RecipeRegistry.craft(recipe, _player.inventory, near_bench)
+
+func _world_near_workbench() -> bool:
+	if _player == null:
+		return false
+	var world: VoxelWorld = _player.get_world()
+	if world == null:
+		return false
+	return world.is_near_workbench(_player.global_position, 4.0)
+
+func _refresh_crafting() -> void:
+	if _player == null:
+		return
+	var near_bench: bool = _world_near_workbench()
+	for row in _craft_rows:
+		var recipe: Recipe = row["recipe"]
+		var button: Button = row["button"]
+		var label: Label = row["label"]
+		var available := Dictionary()
+		for item_name in recipe.inputs:
+			available[item_name] = _player.inventory.count_item(BlockRegistry.get_id_by_name(item_name))
+		var have_materials: bool = recipe.is_satisfied_by(available)
+		var have_bench: bool = (not recipe.requires_workbench) or near_bench
+		button.disabled = not (have_materials and have_bench)
+
+		var parts: PackedStringArray = []
+		for item_name in recipe.inputs:
+			parts.append("%s x%d" % [item_name, int(recipe.inputs[item_name])])
+		var suffix: String = " (workbench)" if recipe.requires_workbench else ""
+		label.text = "%s -> %d%s\n%s" % [recipe.recipe_name, recipe.output_count, suffix, ", ".join(parts)]
 
 func _refresh_slots() -> void:
 	if _player == null:
