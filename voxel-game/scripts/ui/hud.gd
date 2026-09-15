@@ -20,7 +20,8 @@ var _death_label: Label
 var _hotbar_slots: Array = []
 var _inventory_screen: Control
 var _inventory_slots: Array = []
-var _craft_rows: Array = []  # [{recipe, button, label}]
+var _grid_slots: Array = []
+var _output_slot: Panel
 var _settings_screen: Control
 
 func _ready() -> void:
@@ -53,7 +54,7 @@ func _process(_delta: float) -> void:
 	]
 	_refresh_hotbar_selection()
 	if _inventory_screen.visible:
-		_refresh_crafting()
+		_refresh_crafting_grid()
 
 func toggle_inventory() -> void:
 	_inventory_screen.visible = not _inventory_screen.visible
@@ -155,6 +156,7 @@ func _build_hotbar() -> void:
 
 	for i in range(HOTBAR_COUNT):
 		var slot: Panel = _make_slot_panel()
+		_connect_secondary_click(slot.get_node("Button"), _add_inventory_item_to_grid.bind(i))
 		box.add_child(slot)
 		_hotbar_slots.append(slot)
 
@@ -198,51 +200,59 @@ func _build_inventory_screen() -> void:
 		var slot: Panel = _make_slot_panel()
 		var button: Button = slot.get_node("Button")
 		button.pressed.connect(_on_inventory_slot_pressed.bind(i))
+		_connect_secondary_click(button, _add_inventory_item_to_grid.bind(i))
 		grid.add_child(slot)
 		_inventory_slots.append(slot)
 
-	_build_crafting_panel(row, craft_panel_width, grid_height)
+	_build_crafting_grid_panel(row, craft_panel_width, grid_height)
 
 	add_child(_inventory_screen)
 
-## Recipes listed as rows (shapeless: quantities only, no grid shape) — a
-## crafting grid's actual positions don't matter for matching, so a list
-## covers the same functionality with much simpler, more robust UI.
-func _build_crafting_panel(parent: Control, panel_width: int, panel_height: int) -> void:
+## A real 3x3 crafting grid (2x2 active without a workbench nearby, full
+## 3x3 with one — the other 5 slots are visibly locked). Right-click a
+## hotbar/inventory slot to send one item into the grid; left-click a
+## filled grid slot to take it back; left-click the output slot to craft.
+func _build_crafting_grid_panel(parent: Control, panel_width: int, panel_height: int) -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(panel_width, panel_height)
 	parent.add_child(panel)
 
-	var scroll := ScrollContainer.new()
-	panel.add_child(scroll)
+	var outer := VBoxContainer.new()
+	outer.alignment = BoxContainer.ALIGNMENT_CENTER
+	panel.add_child(outer)
 
-	var list := VBoxContainer.new()
-	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	list.add_theme_constant_override("separation", 6)
-	scroll.add_child(list)
+	var hint := Label.new()
+	hint.text = "Right-click to add, left-click to take back"
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD
+	outer.add_child(hint)
 
-	for recipe in RecipeRegistry.recipes:
-		var recipe_row := HBoxContainer.new()
+	var row := HBoxContainer.new()
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	row.add_theme_constant_override("separation", 16)
+	outer.add_child(row)
 
-		var icon := TextureRect.new()
-		icon.custom_minimum_size = Vector2(28, 28)
-		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-		icon.stretch_mode = TextureRect.STRETCH_SCALE
-		icon.texture = BlockRegistry.get_icon_texture(BlockRegistry.get_id_by_name(recipe.output_name))
-		recipe_row.add_child(icon)
+	var grid := GridContainer.new()
+	grid.columns = 3
+	grid.add_theme_constant_override("h_separation", SLOT_SEP)
+	grid.add_theme_constant_override("v_separation", SLOT_SEP)
+	row.add_child(grid)
 
-		var label := Label.new()
-		label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		recipe_row.add_child(label)
+	for i in range(CraftingGrid.SIZE):
+		var slot: Panel = _make_slot_panel()
+		var button: Button = slot.get_node("Button")
+		button.pressed.connect(_on_grid_slot_pressed.bind(i))
+		grid.add_child(slot)
+		_grid_slots.append(slot)
 
-		var craft_button := Button.new()
-		craft_button.text = "Craft"
-		craft_button.focus_mode = Control.FOCUS_NONE
-		craft_button.pressed.connect(_on_craft_pressed.bind(recipe))
-		recipe_row.add_child(craft_button)
+	var arrow := Label.new()
+	arrow.text = "->"
+	row.add_child(arrow)
 
-		list.add_child(recipe_row)
-		_craft_rows.append({"recipe": recipe, "button": craft_button, "label": label})
+	_output_slot = _make_slot_panel()
+	var output_button: Button = _output_slot.get_node("Button")
+	output_button.pressed.connect(_on_output_pressed)
+	row.add_child(_output_slot)
 
 ## Render distance, FOV, mouse sensitivity — each a slider wired straight
 ## to Settings.set_*(), which applies immediately and persists to disk.
@@ -343,12 +353,6 @@ func _on_inventory_slot_pressed(index: int) -> void:
 		return
 	_player.inventory.swap_slots(index, _player.selected_slot)
 
-func _on_craft_pressed(recipe: Recipe) -> void:
-	if _player == null:
-		return
-	var near_bench: bool = _world_near_workbench()
-	RecipeRegistry.craft(recipe, _player.inventory, near_bench)
-
 func _world_near_workbench() -> bool:
 	if _player == null:
 		return false
@@ -357,26 +361,67 @@ func _world_near_workbench() -> bool:
 		return false
 	return world.is_near_workbench(_player.global_position, 4.0)
 
-func _refresh_crafting() -> void:
+func _active_grid_indices() -> Array:
+	return CraftingGrid.ACTIVE_3X3 if _world_near_workbench() else CraftingGrid.ACTIVE_2X2
+
+## Right-click handler for a hotbar/inventory slot: moves one item from
+## that inventory slot into the first active grid slot that will take it
+## (an empty one, or one already holding the same item and not full).
+func _add_inventory_item_to_grid(inventory_index: int) -> void:
+	if _player == null:
+		return
+	var data: Dictionary = _player.inventory.get_slot(inventory_index)
+	if data["id"] == BlockRegistry.AIR_ID or data["count"] <= 0:
+		return
+	for i in _active_grid_indices():
+		if _player.crafting_grid.add_one(i, data["id"]):
+			_player.inventory.remove_from_slot(inventory_index, 1)
+			return
+
+func _on_grid_slot_pressed(index: int) -> void:
+	if _player == null:
+		return
+	var grid: CraftingGrid = _player.crafting_grid
+	var data: Dictionary = grid.get_slot(index)
+	if data["id"] == BlockRegistry.AIR_ID or data["count"] <= 0:
+		return
+	var leftover: int = _player.inventory.add_item(data["id"], data["count"])
+	grid.slots[index] = {"id": data["id"] if leftover > 0 else BlockRegistry.AIR_ID, "count": leftover}
+	grid.changed.emit()
+
+func _on_output_pressed() -> void:
 	if _player == null:
 		return
 	var near_bench: bool = _world_near_workbench()
-	for row in _craft_rows:
-		var recipe: Recipe = row["recipe"]
-		var button: Button = row["button"]
-		var label: Label = row["label"]
-		var available := Dictionary()
-		for item_name in recipe.inputs:
-			available[item_name] = _player.inventory.count_item(BlockRegistry.get_id_by_name(item_name))
-		var have_materials: bool = recipe.is_satisfied_by(available)
-		var have_bench: bool = (not recipe.requires_workbench) or near_bench
-		button.disabled = not (have_materials and have_bench)
+	var active: Array = _active_grid_indices()
+	var recipe: Recipe = RecipeRegistry.find_match(_player.crafting_grid, active, near_bench)
+	if recipe == null:
+		return
+	RecipeRegistry.craft_from_grid(recipe, _player.crafting_grid, active, _player.inventory)
 
-		var parts: PackedStringArray = []
-		for item_name in recipe.inputs:
-			parts.append("%s x%d" % [item_name, int(recipe.inputs[item_name])])
-		var suffix: String = " (workbench)" if recipe.requires_workbench else ""
-		label.text = "%s -> %d%s\n%s" % [recipe.recipe_name, recipe.output_count, suffix, ", ".join(parts)]
+func _refresh_crafting_grid() -> void:
+	if _player == null:
+		return
+	var near_bench: bool = _world_near_workbench()
+	var active: Array = _active_grid_indices()
+	for i in range(CraftingGrid.SIZE):
+		_apply_slot_display(_grid_slots[i], _player.crafting_grid.get_slot(i))
+		var is_active: bool = i in active
+		_grid_slots[i].modulate = Color(1, 1, 1, 1) if is_active else Color(1, 1, 1, 0.35)
+		_grid_slots[i].get_node("Button").disabled = not is_active
+
+	var recipe: Recipe = RecipeRegistry.find_match(_player.crafting_grid, active, near_bench)
+	if recipe != null:
+		var output_id: int = BlockRegistry.get_id_by_name(recipe.output_name)
+		_apply_slot_display(_output_slot, {"id": output_id, "count": recipe.output_count})
+	else:
+		_apply_slot_display(_output_slot, {"id": BlockRegistry.AIR_ID, "count": 0})
+
+func _connect_secondary_click(button: Button, callback: Callable) -> void:
+	button.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			callback.call()
+	)
 
 func _refresh_slots() -> void:
 	if _player == null:

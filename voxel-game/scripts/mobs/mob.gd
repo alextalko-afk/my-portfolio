@@ -1,10 +1,10 @@
 class_name Mob
 extends CharacterBody3D
 ## Base hostile mob: chases whatever target enters its sight radius by
-## walking the straight-line vector toward it (no pathfinding — pathfinding
-## around a streamed, player-editable voxel world would mean rebaking a
-## NavigationRegion3D on every block edit, which is a lot of machinery for
-## a single melee chaser) and attacks in melee range.
+## re-planning a path over the voxel grid every REPATH_INTERVAL seconds
+## (VoxelPathfinder — see that file for why a block-grid A* replaced an
+## earlier NavigationRegion3D/Recast attempt) and walking its waypoints,
+## hopping up 1-block steps as needed. Attacks in melee range.
 
 @export var max_health: float = 20.0
 @export var move_speed: float = 3.0
@@ -13,11 +13,19 @@ extends CharacterBody3D
 @export var attack_damage: float = 2.0
 @export var attack_cooldown: float = 1.0
 @export var gravity: float = 20.0
+@export var jump_velocity: float = 6.0
+@export var repath_interval: float = 0.5
+@export var waypoint_arrival_distance: float = 0.6
 
 var health: float
 var _target: Node3D
 var _attack_cooldown_left: float = 0.0
 var _attack_audio: AudioStreamPlayer3D
+
+var _world: VoxelWorld
+var _current_path: Array = []
+var _path_index: int = 0
+var _repath_timer: float = 0.0
 
 func _ready() -> void:
 	add_to_group("mob")
@@ -25,6 +33,9 @@ func _ready() -> void:
 	_attack_audio = AudioStreamPlayer3D.new()
 	_attack_audio.stream = SoundLibrary.mob_attack
 	add_child(_attack_audio)
+	# Mobs are always spawned as a direct child of the World node (see
+	# MobSpawner) — reuse that instead of needing a separate wiring step.
+	_world = get_parent() as VoxelWorld
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -47,11 +58,18 @@ func _physics_process(delta: float) -> void:
 	if distance > sight_radius:
 		velocity.x = 0.0
 		velocity.z = 0.0
+		_current_path.clear()
 	elif distance > attack_range:
-		var direction: Vector3 = to_target.normalized()
-		velocity.x = direction.x * move_speed
-		velocity.z = direction.z * move_speed
-		look_at(global_position + direction, Vector3.UP)
+		_repath_timer -= delta
+		if _repath_timer <= 0.0 and _world != null:
+			_current_path = VoxelPathfinder.find_path(_world, global_position, _target.global_position)
+			_path_index = 0
+			_repath_timer = repath_interval
+
+		if _current_path.is_empty():
+			_move_toward(to_target.normalized(), delta)
+		else:
+			_follow_path(delta)
 	else:
 		velocity.x = 0.0
 		velocity.z = 0.0
@@ -61,6 +79,45 @@ func _physics_process(delta: float) -> void:
 			_attack_audio.play()
 
 	move_and_slide()
+
+func _follow_path(delta: float) -> void:
+	if _path_index >= _current_path.size():
+		_current_path.clear()
+		velocity.x = 0.0
+		velocity.z = 0.0
+		return
+
+	var waypoint: Vector3 = _current_path[_path_index]
+	var to_waypoint: Vector3 = waypoint - global_position
+	var horizontal := Vector3(to_waypoint.x, 0.0, to_waypoint.z)
+
+	if horizontal.length() < waypoint_arrival_distance:
+		_path_index += 1
+		if _path_index >= _current_path.size():
+			velocity.x = 0.0
+			velocity.z = 0.0
+			return
+		waypoint = _current_path[_path_index]
+		to_waypoint = waypoint - global_position
+		horizontal = Vector3(to_waypoint.x, 0.0, to_waypoint.z)
+
+	_move_toward(horizontal.normalized() if horizontal.length() > 0.01 else Vector3.ZERO, delta)
+
+	# The pathfinder's neighbor search allows stepping up exactly one
+	# block; CharacterBody3D has no built-in step-up, so hop when the
+	# next waypoint is a block higher and we're close enough horizontally
+	# to actually be walking into that step.
+	if waypoint.y > global_position.y + 0.6 and is_on_floor() and horizontal.length() < 1.2:
+		velocity.y = jump_velocity
+
+func _move_toward(direction: Vector3, _delta: float) -> void:
+	if direction.length() > 0.01:
+		velocity.x = direction.x * move_speed
+		velocity.z = direction.z * move_speed
+		look_at(global_position + direction, Vector3.UP)
+	else:
+		velocity.x = 0.0
+		velocity.z = 0.0
 
 func set_target(target: Node3D) -> void:
 	_target = target
@@ -72,7 +129,7 @@ func take_damage(amount: float) -> void:
 
 ## Builds the mob's body from primitive meshes (capsule + box head) tinted
 ## a zombie green — no external model needed.
-static func build_visuals(root: CharacterBody3D) -> void:
+static func build_visuals(root: Mob) -> void:
 	var body := MeshInstance3D.new()
 	body.name = "Body"
 	var capsule := CapsuleMesh.new()

@@ -26,6 +26,10 @@ const TILE_LAVA := 16
 var blocks: Array[BlockType] = []
 var atlas_texture: ImageTexture
 var chunk_material: StandardMaterial3D
+## Second, alpha-blended material for the water-only surface every chunk
+## mesh also builds — a real see-through material, not just the "renders
+## opaque but culls like it's transparent" treatment leaves get.
+var water_material: StandardMaterial3D
 
 var _id_to_block: Dictionary = {}
 var _name_to_id: Dictionary = {}
@@ -272,6 +276,7 @@ func _register_blocks() -> void:
 	water.texture_bottom = TILE_WATER
 	water.is_transparent = true
 	water.is_solid = false
+	water.render_transparent = true
 	water.hardness = 0.0
 	water.drop_item = ""
 	register_block(water)
@@ -315,3 +320,12 @@ func _build_material() -> void:
 	chunk_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
 	chunk_material.roughness = 1.0
 	chunk_material.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
+
+	water_material = StandardMaterial3D.new()
+	water_material.albedo_texture = atlas_texture
+	water_material.albedo_color = Color(1.0, 1.0, 1.0, 0.55)
+	water_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_NEAREST
+	water_material.roughness = 0.05
+	water_material.metallic_specular = 0.6
+	water_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	water_material.cull_mode = BaseMaterial3D.CULL_DISABLED

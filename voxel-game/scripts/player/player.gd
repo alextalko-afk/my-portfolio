@@ -33,6 +33,7 @@ var _world: VoxelWorld
 var _spawn_ready: bool = false
 
 var inventory: Inventory = Inventory.new()
+var crafting_grid: CraftingGrid = CraftingGrid.new()
 var selected_slot: int = 0
 
 var health: float

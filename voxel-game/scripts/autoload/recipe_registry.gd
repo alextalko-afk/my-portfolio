@@ -10,22 +10,36 @@ func _ready() -> void:
 func register_recipe(recipe: Recipe) -> void:
 	recipes.append(recipe)
 
-## Checks how much of an item the inventory holds and tries to craft the
-## given recipe from it. Returns false (no state changed) if there isn't
-## enough, or the recipe needs a workbench the player isn't at.
-func craft(recipe: Recipe, inventory: Inventory, near_workbench: bool) -> bool:
-	if recipe.requires_workbench and not near_workbench:
-		return false
-	for item_name in recipe.inputs:
-		var block_id: int = BlockRegistry.get_id_by_name(item_name)
-		if inventory.count_item(block_id) < int(recipe.inputs[item_name]):
-			return false
-	for item_name in recipe.inputs:
-		var block_id: int = BlockRegistry.get_id_by_name(item_name)
-		inventory.remove_item(block_id, int(recipe.inputs[item_name]))
+## Finds the (single) recipe whose ingredients exactly match what's sitting
+## in the grid's active slots: every ingredient present in at least the
+## required amount, and nothing else in an active slot that the recipe
+## doesn't call for (an unrelated item in the grid blocks a match, same as
+## vanilla — it isn't just ignored and silently consumed).
+func find_match(grid: CraftingGrid, active_indices: Array, near_workbench: bool) -> Recipe:
+	var totals: Dictionary = grid.get_active_totals_by_name(active_indices)
+	if totals.is_empty():
+		return null
+	for recipe in recipes:
+		if recipe.requires_workbench and not near_workbench:
+			continue
+		var has_extra_item := false
+		for item_name in totals:
+			if not recipe.inputs.has(item_name):
+				has_extra_item = true
+				break
+		if has_extra_item:
+			continue
+		if recipe.is_satisfied_by(totals):
+			return recipe
+	return null
+
+## Consumes the matched recipe's ingredients from the grid and adds the
+## output to the inventory. Caller must already hold a match from
+## find_match — this doesn't re-check requires_workbench.
+func craft_from_grid(recipe: Recipe, grid: CraftingGrid, active_indices: Array, inventory: Inventory) -> void:
+	grid.consume(active_indices, recipe.inputs)
 	var output_id: int = BlockRegistry.get_id_by_name(recipe.output_name)
 	inventory.add_item(output_id, recipe.output_count)
-	return true
 
 func _register_recipes() -> void:
 	var planks := Recipe.new()

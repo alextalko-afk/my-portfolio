@@ -15,3 +15,7 @@ extends Resource
 ## False for inventory-only items (sticks, tools) that exist for crafting
 ## but were never meant to be placed as a world voxel.
 @export var is_placeable: bool = true
+## True only for water: its faces go into the chunk's separate alpha-
+## blended surface/material instead of the shared opaque one, so it's
+## actually see-through rather than merely face-culled like leaves.
+@export var render_transparent: bool = false
