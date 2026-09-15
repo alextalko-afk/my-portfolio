@@ -44,6 +44,10 @@ var _spawn_position: Vector3
 var _hud: Hud
 var _highlight: MeshInstance3D
 
+var _footstep_audio: AudioStreamPlayer3D
+var _hurt_audio: AudioStreamPlayer3D
+var _footstep_timer: float = 0.0
+
 const HOTBAR_ACTIONS := ["hotbar_1", "hotbar_2", "hotbar_3", "hotbar_4", "hotbar_5", "hotbar_6", "hotbar_7", "hotbar_8", "hotbar_9"]
 
 func _ready() -> void:
@@ -59,6 +63,14 @@ func _ready() -> void:
 		_world.add_child(_highlight)
 	_highlight.visible = false
 
+	_footstep_audio = AudioStreamPlayer3D.new()
+	_footstep_audio.stream = SoundLibrary.footstep
+	add_child(_footstep_audio)
+
+	_hurt_audio = AudioStreamPlayer3D.new()
+	_hurt_audio.stream = SoundLibrary.player_hurt
+	add_child(_hurt_audio)
+
 	health = max_health
 	_spawn_position = global_position
 
@@ -67,6 +79,7 @@ func take_damage(amount: float) -> void:
 		return
 	health = maxf(0.0, health - amount)
 	health_changed.emit(health, max_health)
+	_hurt_audio.play()
 	if health <= 0.0:
 		_die()
 
@@ -163,6 +176,17 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, speed)
 
 	move_and_slide()
+	_update_footsteps(delta, speed)
+
+func _update_footsteps(delta: float, speed: float) -> void:
+	var horizontal_speed: float = Vector2(velocity.x, velocity.z).length()
+	if not is_on_floor() or horizontal_speed < 0.5:
+		_footstep_timer = 0.0
+		return
+	_footstep_timer -= delta
+	if _footstep_timer <= 0.0:
+		_footstep_audio.play()
+		_footstep_timer = clampf(2.2 / speed, 0.28, 0.6)
 
 func _process(_delta: float) -> void:
 	if _is_dead:
@@ -201,6 +225,7 @@ func _break_targeted_block() -> void:
 	if block != null and block.drop_item != "":
 		var drop_id: int = BlockRegistry.get_id_by_name(block.drop_item)
 		inventory.add_item(drop_id, 1)
+	_play_one_shot_at(Vector3(block_pos) + Vector3(0.5, 0.5, 0.5), SoundLibrary.block_break)
 
 func _place_targeted_block() -> void:
 	if _world == null:
@@ -219,6 +244,20 @@ func _place_targeted_block() -> void:
 		return
 	if _world.set_block_world(place_pos.x, place_pos.y, place_pos.z, held["id"]):
 		inventory.remove_from_slot(selected_slot, 1)
+		_play_one_shot_at(Vector3(place_pos) + Vector3(0.5, 0.5, 0.5), SoundLibrary.block_place)
+
+## A one-off AudioStreamPlayer3D at a fixed world position (a block being
+## broken/placed shouldn't sound like it's glued to the player, and won't
+## move again after this single play), freed once playback finishes.
+func _play_one_shot_at(world_pos: Vector3, stream: AudioStreamWAV) -> void:
+	if _world == null:
+		return
+	var one_shot := AudioStreamPlayer3D.new()
+	one_shot.stream = stream
+	_world.add_child(one_shot)
+	one_shot.global_position = world_pos
+	one_shot.finished.connect(one_shot.queue_free)
+	one_shot.play()
 
 ## Crude AABB check (capsule radius 0.4, height 1.8, origin at feet) so
 ## placing a block can't wedge it inside the player.

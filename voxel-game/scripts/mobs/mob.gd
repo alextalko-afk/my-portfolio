@@ -17,10 +17,14 @@ extends CharacterBody3D
 var health: float
 var _target: Node3D
 var _attack_cooldown_left: float = 0.0
+var _attack_audio: AudioStreamPlayer3D
 
 func _ready() -> void:
 	add_to_group("mob")
 	health = max_health
+	_attack_audio = AudioStreamPlayer3D.new()
+	_attack_audio.stream = SoundLibrary.mob_attack
+	add_child(_attack_audio)
 
 func _physics_process(delta: float) -> void:
 	if not is_on_floor():
@@ -54,6 +58,7 @@ func _physics_process(delta: float) -> void:
 		if _attack_cooldown_left <= 0.0 and _target.has_method("take_damage"):
 			_target.take_damage(attack_damage)
 			_attack_cooldown_left = attack_cooldown
+			_attack_audio.play()
 
 	move_and_slide()
 
