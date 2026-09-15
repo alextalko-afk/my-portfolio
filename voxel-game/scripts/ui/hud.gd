@@ -21,6 +21,7 @@ var _hotbar_slots: Array = []
 var _inventory_screen: Control
 var _inventory_slots: Array = []
 var _craft_rows: Array = []  # [{recipe, button, label}]
+var _settings_screen: Control
 
 func _ready() -> void:
 	layer = 10
@@ -30,6 +31,7 @@ func _ready() -> void:
 	_build_death_label()
 	_build_hotbar()
 	_build_inventory_screen()
+	_build_settings_screen()
 
 func setup(player: VoxelPlayer) -> void:
 	_player = player
@@ -58,6 +60,12 @@ func toggle_inventory() -> void:
 
 func is_inventory_open() -> bool:
 	return _inventory_screen.visible
+
+func toggle_settings() -> void:
+	_settings_screen.visible = not _settings_screen.visible
+
+func is_settings_open() -> bool:
+	return _settings_screen.visible
 
 func _build_crosshair() -> void:
 	_crosshair = Control.new()
@@ -235,6 +243,78 @@ func _build_crafting_panel(parent: Control, panel_width: int, panel_height: int)
 
 		list.add_child(recipe_row)
 		_craft_rows.append({"recipe": recipe, "button": craft_button, "label": label})
+
+## Render distance, FOV, mouse sensitivity — each a slider wired straight
+## to Settings.set_*(), which applies immediately and persists to disk.
+## No "Apply" button: the whole point of this stage is that it's live.
+func _build_settings_screen() -> void:
+	_settings_screen = Control.new()
+	_settings_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_settings_screen.visible = false
+
+	var dim := ColorRect.new()
+	dim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	dim.color = Color(0, 0, 0, 0.5)
+	_settings_screen.add_child(dim)
+
+	var panel := PanelContainer.new()
+	panel.anchor_left = 0.5
+	panel.anchor_right = 0.5
+	panel.anchor_top = 0.5
+	panel.anchor_bottom = 0.5
+	panel.offset_left = -180
+	panel.offset_right = 180
+	panel.offset_top = -90
+	panel.offset_bottom = 90
+	_settings_screen.add_child(panel)
+
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 14)
+	panel.add_child(list)
+
+	var title := Label.new()
+	title.text = "Settings"
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	list.add_child(title)
+
+	_add_settings_row(list, "Render distance", Settings.RENDER_DISTANCE_MIN, Settings.RENDER_DISTANCE_MAX, 1.0, Settings.render_distance,
+		func(v: float) -> void: Settings.set_render_distance(int(v)),
+		func(v: float) -> String: return str(int(v)))
+	_add_settings_row(list, "FOV", Settings.FOV_MIN, Settings.FOV_MAX, 1.0, Settings.fov,
+		func(v: float) -> void: Settings.set_fov(v),
+		func(v: float) -> String: return "%d" % int(v))
+	_add_settings_row(list, "Mouse sensitivity", Settings.SENSITIVITY_MIN, Settings.SENSITIVITY_MAX, 0.0001, Settings.mouse_sensitivity,
+		func(v: float) -> void: Settings.set_mouse_sensitivity(v),
+		func(v: float) -> String: return "%.4f" % v)
+
+	add_child(_settings_screen)
+
+func _add_settings_row(parent: Control, label_text: String, min_value: float, max_value: float, step: float, initial: float, on_change: Callable, format_value: Callable) -> void:
+	var row := VBoxContainer.new()
+
+	var header := HBoxContainer.new()
+	var label := Label.new()
+	label.text = label_text
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(label)
+	var value_label := Label.new()
+	value_label.text = format_value.call(initial)
+	header.add_child(value_label)
+	row.add_child(header)
+
+	var slider := HSlider.new()
+	slider.min_value = min_value
+	slider.max_value = max_value
+	slider.step = step
+	slider.value = initial
+	slider.custom_minimum_size = Vector2(300, 0)
+	slider.value_changed.connect(func(v: float) -> void:
+		value_label.text = format_value.call(v)
+		on_change.call(v)
+	)
+	row.add_child(slider)
+
+	parent.add_child(row)
 
 func _make_slot_panel() -> Panel:
 	var panel := Panel.new()

@@ -64,6 +64,9 @@ var _last_player_chunk: Vector2i = Vector2i(999999, 999999)
 func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
 
+	render_distance = Settings.render_distance
+	Settings.render_distance_changed.connect(_on_render_distance_changed)
+
 	# The seed must be known before noise is configured below, so a saved
 	# world regenerates identical terrain; everything else from the save
 	# (player state, time of day) is applied later by Game, once World,
@@ -328,6 +331,14 @@ func _request_rebuild(coord: Vector2i) -> void:
 		return
 	_pending_chunks[coord] = true
 	_request_mesh_build(chunk)
+
+## Applying a new render distance immediately (not waiting for the player
+## to cross into a new chunk) is what makes the settings menu change feel
+## live rather than "takes effect once you move".
+func _on_render_distance_changed(value: int) -> void:
+	render_distance = value
+	if _last_player_chunk != Vector2i(999999, 999999):
+		_update_loaded_chunks(_last_player_chunk)
 
 func _update_loaded_chunks(center: Vector2i) -> void:
 	var needed: Dictionary = {}

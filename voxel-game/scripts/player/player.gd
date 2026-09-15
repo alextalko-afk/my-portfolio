@@ -12,7 +12,6 @@ signal respawned
 @export var sprint_speed: float = 8.5
 @export var jump_velocity: float = 6.5
 @export var gravity: float = 20.0
-@export var mouse_sensitivity: float = 0.0025
 @export var world_path: NodePath
 @export var hud_path: NodePath
 @export var reach: float = 6.0
@@ -71,6 +70,9 @@ func _ready() -> void:
 	_hurt_audio.stream = SoundLibrary.player_hurt
 	add_child(_hurt_audio)
 
+	camera.fov = Settings.fov
+	Settings.fov_changed.connect(func(value: float) -> void: camera.fov = value)
+
 	health = max_health
 	_spawn_position = global_position
 
@@ -121,18 +123,22 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("inventory"):
 		_toggle_inventory()
 		return
+	if event.is_action_pressed("settings_menu"):
+		_toggle_settings()
+		return
 	for i in range(HOTBAR_ACTIONS.size()):
 		if event.is_action_pressed(HOTBAR_ACTIONS[i]):
 			selected_slot = i
 			return
 
-	if _hud != null and _hud.is_inventory_open():
+	if _hud != null and (_hud.is_inventory_open() or _hud.is_settings_open()):
 		return
 
 	if event is InputEventMouseMotion and mouse_captured:
 		var motion: InputEventMouseMotion = event
-		rotate_y(-motion.relative.x * mouse_sensitivity)
-		pitch = clampf(pitch - motion.relative.y * mouse_sensitivity, -1.55, 1.55)
+		var sensitivity: float = Settings.mouse_sensitivity
+		rotate_y(-motion.relative.x * sensitivity)
+		pitch = clampf(pitch - motion.relative.y * sensitivity, -1.55, 1.55)
 		head.rotation.x = pitch
 	elif event is InputEventKey and event.pressed and event.keycode == KEY_ESCAPE:
 		_release_mouse()
@@ -151,6 +157,15 @@ func _toggle_inventory() -> void:
 		return
 	_hud.toggle_inventory()
 	if _hud.is_inventory_open():
+		_release_mouse()
+	else:
+		_capture_mouse()
+
+func _toggle_settings() -> void:
+	if _hud == null:
+		return
+	_hud.toggle_settings()
+	if _hud.is_settings_open():
 		_release_mouse()
 	else:
 		_capture_mouse()
