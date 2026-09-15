@@ -9,8 +9,8 @@ extends CharacterBody3D
 @export var gravity: float = 20.0
 @export var mouse_sensitivity: float = 0.0025
 @export var world_path: NodePath
+@export var hud_path: NodePath
 @export var reach: float = 6.0
-@export var place_block_name: String = "stone"
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -24,21 +24,39 @@ var _world: VoxelWorld
 ## otherwise the player free-falls through the not-yet-built ground.
 var _spawn_ready: bool = false
 
-var _place_block_id: int = 0
+var inventory: Inventory = Inventory.new()
+var selected_slot: int = 0
+
+var _hud: Hud
 var _highlight: MeshInstance3D
+
+const HOTBAR_ACTIONS := ["hotbar_1", "hotbar_2", "hotbar_3", "hotbar_4", "hotbar_5", "hotbar_6", "hotbar_7", "hotbar_8", "hotbar_9"]
 
 func _ready() -> void:
 	add_to_group("player")
 	_capture_mouse()
 	if world_path != NodePath():
 		_world = get_node(world_path)
-	_place_block_id = BlockRegistry.get_id_by_name(place_block_name)
+	if hud_path != NodePath():
+		_hud = get_node(hud_path)
+		_hud.setup(self)
 	_highlight = _build_highlight_mesh()
 	if _world != null:
 		_world.add_child(_highlight)
 	_highlight.visible = false
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("inventory"):
+		_toggle_inventory()
+		return
+	for i in range(HOTBAR_ACTIONS.size()):
+		if event.is_action_pressed(HOTBAR_ACTIONS[i]):
+			selected_slot = i
+			return
+
+	if _hud != null and _hud.is_inventory_open():
+		return
+
 	if event is InputEventMouseMotion and mouse_captured:
 		var motion: InputEventMouseMotion = event
 		rotate_y(-motion.relative.x * mouse_sensitivity)
@@ -52,6 +70,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		_break_targeted_block()
 	elif event.is_action_pressed("place_block"):
 		_place_targeted_block()
+
+func _toggle_inventory() -> void:
+	if _hud == null:
+		return
+	_hud.toggle_inventory()
+	if _hud.is_inventory_open():
+		_release_mouse()
+	else:
+		_capture_mouse()
 
 func _capture_mouse() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -109,10 +136,19 @@ func _break_targeted_block() -> void:
 	if hit.is_empty():
 		return
 	var block_pos: Vector3i = Vector3i(floor(hit["position"] - hit["normal"] * 0.5))
-	_world.set_block_world(block_pos.x, block_pos.y, block_pos.z, BlockRegistry.AIR_ID)
+	var broken_id: int = _world.get_block_at(block_pos.x, block_pos.y, block_pos.z)
+	if not _world.set_block_world(block_pos.x, block_pos.y, block_pos.z, BlockRegistry.AIR_ID):
+		return
+	var block: BlockType = BlockRegistry.get_block(broken_id)
+	if block != null and block.drop_item != "":
+		var drop_id: int = BlockRegistry.get_id_by_name(block.drop_item)
+		inventory.add_item(drop_id, 1)
 
 func _place_targeted_block() -> void:
 	if _world == null:
+		return
+	var held: Dictionary = inventory.get_slot(selected_slot)
+	if held["id"] == BlockRegistry.AIR_ID or held["count"] <= 0:
 		return
 	var hit: Dictionary = _raycast_block()
 	if hit.is_empty():
@@ -120,7 +156,8 @@ func _place_targeted_block() -> void:
 	var place_pos: Vector3i = Vector3i(floor(hit["position"] + hit["normal"] * 0.5))
 	if _overlaps_player(place_pos):
 		return
-	_world.set_block_world(place_pos.x, place_pos.y, place_pos.z, _place_block_id)
+	if _world.set_block_world(place_pos.x, place_pos.y, place_pos.z, held["id"]):
+		inventory.remove_from_slot(selected_slot, 1)
 
 ## Crude AABB check (capsule radius 0.4, height 1.8, origin at feet) so
 ## placing a block can't wedge it inside the player.

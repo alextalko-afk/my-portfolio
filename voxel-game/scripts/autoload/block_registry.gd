@@ -61,6 +61,19 @@ func is_solid(id: int) -> bool:
 func get_uv_rect(tile_index: int) -> Rect2:
 	return TextureAtlasBuilder.tile_uv_rect(tile_index)
 
+## Small icon for UI (hotbar/inventory slots), cropped from the same atlas
+## used for chunk meshes so it always matches the in-world texture.
+func get_icon_texture(id: int) -> AtlasTexture:
+	var block: BlockType = get_block(id)
+	if block == null:
+		return null
+	var uv_rect: Rect2 = get_uv_rect(block.texture_top)
+	var pixels: float = float(TextureAtlasBuilder.ATLAS_PIXELS)
+	var atlas_tex := AtlasTexture.new()
+	atlas_tex.atlas = atlas_texture
+	atlas_tex.region = Rect2(uv_rect.position * pixels, uv_rect.size * pixels)
+	return atlas_tex
+
 func _register_blocks() -> void:
 	var air := BlockType.new()
 	air.id = AIR_ID
