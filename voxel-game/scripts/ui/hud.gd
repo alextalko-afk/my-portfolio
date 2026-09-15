@@ -15,6 +15,8 @@ var _player: VoxelPlayer
 
 var _crosshair: Control
 var _debug_label: Label
+var _hearts: Control
+var _death_label: Label
 var _hotbar_slots: Array = []
 var _inventory_screen: Control
 var _inventory_slots: Array = []
@@ -24,14 +26,20 @@ func _ready() -> void:
 	layer = 10
 	_build_crosshair()
 	_build_debug_label()
+	_build_hearts()
+	_build_death_label()
 	_build_hotbar()
 	_build_inventory_screen()
 
 func setup(player: VoxelPlayer) -> void:
 	_player = player
 	_player.inventory.changed.connect(_refresh_slots)
+	_player.health_changed.connect(func(_c: float, _m: float) -> void: _hearts.queue_redraw())
+	_player.died.connect(func() -> void: _death_label.visible = true)
+	_player.respawned.connect(func() -> void: _death_label.visible = false; _hearts.queue_redraw())
 	_refresh_slots()
 	_refresh_hotbar_selection()
+	_hearts.queue_redraw()
 
 func _process(_delta: float) -> void:
 	if _player == null:
@@ -70,6 +78,53 @@ func _build_debug_label() -> void:
 	_debug_label.add_theme_constant_override("shadow_offset_x", 1)
 	_debug_label.add_theme_constant_override("shadow_offset_y", 1)
 	add_child(_debug_label)
+
+const HEART_SIZE := 18
+const HEART_SEP := 4
+const HEART_POINTS := [
+	Vector2(9, 3.4), Vector2(6.8, 0), Vector2(3.4, 0), Vector2(0, 3.4), Vector2(0, 6.8),
+	Vector2(9, 17), Vector2(18, 6.8), Vector2(18, 3.4), Vector2(14.6, 0), Vector2(11.2, 0),
+]
+
+func _build_hearts() -> void:
+	_hearts = Control.new()
+	_hearts.anchor_left = 0.5
+	_hearts.anchor_right = 0.5
+	_hearts.anchor_top = 1.0
+	_hearts.anchor_bottom = 1.0
+	_hearts.offset_top = -(SLOT_SIZE + 20 + 8 + HEART_SIZE)
+	_hearts.offset_bottom = -(SLOT_SIZE + 20 + 8)
+	_hearts.offset_left = -110
+	_hearts.offset_right = 110
+	_hearts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hearts.draw.connect(_draw_hearts)
+	add_child(_hearts)
+
+func _draw_hearts() -> void:
+	if _player == null:
+		return
+	var max_hearts: int = int(ceil(_player.max_health / 2.0))
+	var current_hearts: float = _player.health / 2.0
+	var empty_color := Color(0.18, 0.18, 0.18, 0.9)
+	var full_color := Color(0.82, 0.12, 0.12)
+	for i in range(max_hearts):
+		var fill: float = clampf(current_hearts - float(i), 0.0, 1.0)
+		var color: Color = empty_color.lerp(full_color, fill)
+		var offset := Vector2(i * (HEART_SIZE + HEART_SEP), 0)
+		var pts := PackedVector2Array()
+		for p in HEART_POINTS:
+			pts.append(p + offset)
+		_hearts.draw_colored_polygon(pts, color)
+
+func _build_death_label() -> void:
+	_death_label = Label.new()
+	_death_label.text = "You died"
+	_death_label.add_theme_font_size_override("font_size", 32)
+	_death_label.add_theme_color_override("font_color", Color(0.9, 0.1, 0.1))
+	_death_label.set_anchors_preset(Control.PRESET_CENTER)
+	_death_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_death_label.visible = false
+	add_child(_death_label)
 
 func _build_hotbar() -> void:
 	var width: int = HOTBAR_COUNT * SLOT_SIZE + (HOTBAR_COUNT - 1) * SLOT_SEP

@@ -1,7 +1,12 @@
 class_name VoxelPlayer
 extends CharacterBody3D
 ## FPS controller: WASD movement, mouse look, jump, sprint, plus raycast
-## block breaking/placing with a wireframe highlight on the targeted block.
+## block breaking/placing with a wireframe highlight on the targeted block,
+## and health/melee combat against mobs.
+
+signal health_changed(current: float, max_value: float)
+signal died
+signal respawned
 
 @export var walk_speed: float = 5.0
 @export var sprint_speed: float = 8.5
@@ -11,6 +16,10 @@ extends CharacterBody3D
 @export var world_path: NodePath
 @export var hud_path: NodePath
 @export var reach: float = 6.0
+@export var max_health: float = 20.0
+@export var attack_damage: float = 4.0
+@export var respawn_delay: float = 2.0
+@export var respawn_invulnerability: float = 1.5
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -26,6 +35,11 @@ var _spawn_ready: bool = false
 
 var inventory: Inventory = Inventory.new()
 var selected_slot: int = 0
+
+var health: float
+var _is_dead: bool = false
+var _invulnerable_until_ms: int = 0
+var _spawn_position: Vector3
 
 var _hud: Hud
 var _highlight: MeshInstance3D
@@ -45,7 +59,38 @@ func _ready() -> void:
 		_world.add_child(_highlight)
 	_highlight.visible = false
 
+	health = max_health
+	_spawn_position = global_position
+
+func take_damage(amount: float) -> void:
+	if _is_dead or Time.get_ticks_msec() < _invulnerable_until_ms:
+		return
+	health = maxf(0.0, health - amount)
+	health_changed.emit(health, max_health)
+	if health <= 0.0:
+		_die()
+
+func _die() -> void:
+	_is_dead = true
+	velocity = Vector3.ZERO
+	_highlight.visible = false
+	died.emit()
+	await get_tree().create_timer(respawn_delay).timeout
+	_respawn()
+
+func _respawn() -> void:
+	global_position = _spawn_position
+	velocity = Vector3.ZERO
+	health = max_health
+	_is_dead = false
+	_invulnerable_until_ms = Time.get_ticks_msec() + int(respawn_invulnerability * 1000.0)
+	health_changed.emit(health, max_health)
+	respawned.emit()
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _is_dead:
+		return
+
 	if event.is_action_pressed("inventory"):
 		_toggle_inventory()
 		return
@@ -92,6 +137,9 @@ func _release_mouse() -> void:
 	mouse_captured = false
 
 func _physics_process(delta: float) -> void:
+	if _is_dead:
+		return
+
 	if not _spawn_ready:
 		if _world != null and _world.is_position_ready(global_position):
 			_spawn_ready = true
@@ -117,6 +165,9 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 func _process(_delta: float) -> void:
+	if _is_dead:
+		_highlight.visible = false
+		return
 	var hit: Dictionary = _raycast_block()
 	if hit.is_empty():
 		_highlight.visible = false
@@ -137,6 +188,10 @@ func _break_targeted_block() -> void:
 		return
 	var hit: Dictionary = _raycast_block()
 	if hit.is_empty():
+		return
+	var collider: Object = hit.get("collider")
+	if collider is Node and collider.is_in_group("mob"):
+		collider.take_damage(attack_damage)
 		return
 	var block_pos: Vector3i = Vector3i(floor(hit["position"] - hit["normal"] * 0.5))
 	var broken_id: int = _world.get_block_at(block_pos.x, block_pos.y, block_pos.z)
