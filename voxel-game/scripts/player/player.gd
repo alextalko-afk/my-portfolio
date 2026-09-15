@@ -1,6 +1,7 @@
 class_name VoxelPlayer
 extends CharacterBody3D
-## Simple FPS controller: WASD movement, mouse look, jump, sprint.
+## FPS controller: WASD movement, mouse look, jump, sprint, plus raycast
+## block breaking/placing with a wireframe highlight on the targeted block.
 
 @export var walk_speed: float = 5.0
 @export var sprint_speed: float = 8.5
@@ -8,6 +9,8 @@ extends CharacterBody3D
 @export var gravity: float = 20.0
 @export var mouse_sensitivity: float = 0.0025
 @export var world_path: NodePath
+@export var reach: float = 6.0
+@export var place_block_name: String = "stone"
 
 @onready var head: Node3D = $Head
 @onready var camera: Camera3D = $Head/Camera3D
@@ -15,17 +18,25 @@ extends CharacterBody3D
 var pitch: float = 0.0
 var mouse_captured: bool = false
 
-var _world: Node
+var _world: VoxelWorld
 ## Chunk meshing/collision finishes asynchronously after the world starts
 ## up, so gravity stays off until the spawn chunk actually has a collider —
 ## otherwise the player free-falls through the not-yet-built ground.
 var _spawn_ready: bool = false
+
+var _place_block_id: int = 0
+var _highlight: MeshInstance3D
 
 func _ready() -> void:
 	add_to_group("player")
 	_capture_mouse()
 	if world_path != NodePath():
 		_world = get_node(world_path)
+	_place_block_id = BlockRegistry.get_id_by_name(place_block_name)
+	_highlight = _build_highlight_mesh()
+	if _world != null:
+		_world.add_child(_highlight)
+	_highlight.visible = false
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and mouse_captured:
@@ -37,6 +48,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		_release_mouse()
 	elif event is InputEventMouseButton and event.pressed and not mouse_captured:
 		_capture_mouse()
+	elif event.is_action_pressed("break_block"):
+		_break_targeted_block()
+	elif event.is_action_pressed("place_block"):
+		_place_targeted_block()
 
 func _capture_mouse() -> void:
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
@@ -70,3 +85,77 @@ func _physics_process(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, speed)
 
 	move_and_slide()
+
+func _process(_delta: float) -> void:
+	var hit: Dictionary = _raycast_block()
+	if hit.is_empty():
+		_highlight.visible = false
+		return
+	var block_pos: Vector3i = Vector3i(floor(hit["position"] - hit["normal"] * 0.5))
+	_highlight.visible = true
+	_highlight.global_position = Vector3(block_pos)
+
+func _raycast_block() -> Dictionary:
+	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var from: Vector3 = camera.global_position
+	var to: Vector3 = from + (-camera.global_transform.basis.z) * reach
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
+	return space_state.intersect_ray(query)
+
+func _break_targeted_block() -> void:
+	if _world == null:
+		return
+	var hit: Dictionary = _raycast_block()
+	if hit.is_empty():
+		return
+	var block_pos: Vector3i = Vector3i(floor(hit["position"] - hit["normal"] * 0.5))
+	_world.set_block_world(block_pos.x, block_pos.y, block_pos.z, BlockRegistry.AIR_ID)
+
+func _place_targeted_block() -> void:
+	if _world == null:
+		return
+	var hit: Dictionary = _raycast_block()
+	if hit.is_empty():
+		return
+	var place_pos: Vector3i = Vector3i(floor(hit["position"] + hit["normal"] * 0.5))
+	if _overlaps_player(place_pos):
+		return
+	_world.set_block_world(place_pos.x, place_pos.y, place_pos.z, _place_block_id)
+
+## Crude AABB check (capsule radius 0.4, height 1.8, origin at feet) so
+## placing a block can't wedge it inside the player.
+func _overlaps_player(block_pos: Vector3i) -> bool:
+	var p: Vector3 = global_position
+	var bx: float = float(block_pos.x)
+	var by: float = float(block_pos.y)
+	var bz: float = float(block_pos.z)
+	var within_x: bool = p.x > bx - 0.4 and p.x < bx + 1.4
+	var within_z: bool = p.z > bz - 0.4 and p.z < bz + 1.4
+	var within_y: bool = p.y < by + 1.0 and p.y + 1.8 > by
+	return within_x and within_z and within_y
+
+func _build_highlight_mesh() -> MeshInstance3D:
+	var vertices := PackedVector3Array([
+		Vector3(0, 0, 0), Vector3(1, 0, 0), Vector3(1, 0, 1), Vector3(0, 0, 1),
+		Vector3(0, 1, 0), Vector3(1, 1, 0), Vector3(1, 1, 1), Vector3(0, 1, 1),
+	])
+	var edges := PackedInt32Array([
+		0, 1, 1, 2, 2, 3, 3, 0,
+		4, 5, 5, 6, 6, 7, 7, 4,
+		0, 4, 1, 5, 2, 6, 3, 7,
+	])
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = vertices
+	arrays[Mesh.ARRAY_INDEX] = edges
+	var line_mesh := ArrayMesh.new()
+	line_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0, 0, 0)
+
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.mesh = line_mesh
+	mesh_instance.material_override = material
+	return mesh_instance

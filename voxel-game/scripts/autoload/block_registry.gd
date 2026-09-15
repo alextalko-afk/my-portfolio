@@ -9,6 +9,12 @@ const TILE_DIRT := 0
 const TILE_STONE := 1
 const TILE_GRASS_TOP := 2
 const TILE_GRASS_SIDE := 3
+const TILE_WOOD_TOP := 4
+const TILE_WOOD_SIDE := 5
+const TILE_LEAVES := 6
+const TILE_SAND := 7
+const TILE_PLANKS := 8
+const TILE_COBBLESTONE := 9
 
 var blocks: Array[BlockType] = []
 var atlas_texture: ImageTexture
@@ -101,12 +107,78 @@ func _register_blocks() -> void:
 	grass.drop_item = "dirt"
 	register_block(grass)
 
+	var wood := BlockType.new()
+	wood.id = 4
+	wood.block_name = "wood"
+	wood.texture_top = TILE_WOOD_TOP
+	wood.texture_side = TILE_WOOD_SIDE
+	wood.texture_bottom = TILE_WOOD_TOP
+	wood.is_transparent = false
+	wood.is_solid = true
+	wood.hardness = 2.0
+	wood.drop_item = "wood"
+	register_block(wood)
+
+	var leaves := BlockType.new()
+	leaves.id = 5
+	leaves.block_name = "leaves"
+	leaves.texture_top = TILE_LEAVES
+	leaves.texture_side = TILE_LEAVES
+	leaves.texture_bottom = TILE_LEAVES
+	leaves.is_transparent = true
+	leaves.is_solid = true
+	leaves.hardness = 0.2
+	leaves.drop_item = "leaves"
+	register_block(leaves)
+
+	var sand := BlockType.new()
+	sand.id = 6
+	sand.block_name = "sand"
+	sand.texture_top = TILE_SAND
+	sand.texture_side = TILE_SAND
+	sand.texture_bottom = TILE_SAND
+	sand.is_transparent = false
+	sand.is_solid = true
+	sand.hardness = 0.5
+	sand.drop_item = "sand"
+	register_block(sand)
+
+	var planks := BlockType.new()
+	planks.id = 7
+	planks.block_name = "planks"
+	planks.texture_top = TILE_PLANKS
+	planks.texture_side = TILE_PLANKS
+	planks.texture_bottom = TILE_PLANKS
+	planks.is_transparent = false
+	planks.is_solid = true
+	planks.hardness = 2.0
+	planks.drop_item = "planks"
+	register_block(planks)
+
+	var cobblestone := BlockType.new()
+	cobblestone.id = 8
+	cobblestone.block_name = "cobblestone"
+	cobblestone.texture_top = TILE_COBBLESTONE
+	cobblestone.texture_side = TILE_COBBLESTONE
+	cobblestone.texture_bottom = TILE_COBBLESTONE
+	cobblestone.is_transparent = false
+	cobblestone.is_solid = true
+	cobblestone.hardness = 2.0
+	cobblestone.drop_item = "cobblestone"
+	register_block(cobblestone)
+
 func _build_atlas() -> void:
 	var image: Image = TextureAtlasBuilder.build_atlas_image()
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_DIRT, Color(0.42, 0.28, 0.16), 0.18)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_STONE, Color(0.5, 0.5, 0.52), 0.14)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_GRASS_TOP, Color(0.32, 0.58, 0.22), 0.18)
 	TextureAtlasBuilder.paint_grass_side_tile(image, TILE_GRASS_SIDE, Color(0.32, 0.58, 0.22), Color(0.42, 0.28, 0.16), 0.18)
+	TextureAtlasBuilder.paint_wood_rings_tile(image, TILE_WOOD_TOP, Color(0.55, 0.38, 0.2), Color(0.36, 0.24, 0.12))
+	TextureAtlasBuilder.paint_wood_bark_tile(image, TILE_WOOD_SIDE, Color(0.4, 0.27, 0.14), 0.16)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_LEAVES, Color(0.18, 0.42, 0.14), 0.28)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_SAND, Color(0.82, 0.74, 0.5), 0.12)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_PLANKS, Color(0.68, 0.5, 0.28), 0.14)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_COBBLESTONE, Color(0.45, 0.45, 0.47), 0.22)
 	atlas_texture = ImageTexture.create_from_image(image)
 
 func _build_material() -> void:

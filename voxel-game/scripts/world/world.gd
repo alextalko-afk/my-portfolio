@@ -89,6 +89,49 @@ func get_block_world(world_x: int, world_y: int, world_z: int) -> int:
 		return blocks[Chunk.local_index(local_x, world_y, local_z)]
 	return _compute_block_at(world_x, world_y, world_z)
 
+## Breaks/places a block at the given world coordinates. Returns false and
+## does nothing if the target chunk isn't loaded yet or is mid-rebuild
+## (its blocks array must not be mutated while a worker thread might still
+## be reading it for that same chunk's mesh build).
+func set_block_world(world_x: int, world_y: int, world_z: int, id: int) -> bool:
+	if world_y < 0 or world_y >= Chunk.HEIGHT:
+		return false
+	var coord := Vector2i(_floor_div(world_x, Chunk.SIZE_X), _floor_div(world_z, Chunk.SIZE_Z))
+	if _pending_chunks.has(coord):
+		return false
+	var chunk: Chunk = chunks.get(coord)
+	if chunk == null:
+		return false
+
+	var local_x: int = world_x - coord.x * Chunk.SIZE_X
+	var local_z: int = world_z - coord.y * Chunk.SIZE_Z
+	chunk.set_block_local(local_x, world_y, local_z, id)
+
+	_chunks_mutex.lock()
+	_chunk_blocks[coord] = chunk.blocks
+	_chunks_mutex.unlock()
+
+	_request_rebuild(coord)
+	if local_x == 0:
+		_request_rebuild(coord + Vector2i(-1, 0))
+	if local_x == Chunk.SIZE_X - 1:
+		_request_rebuild(coord + Vector2i(1, 0))
+	if local_z == 0:
+		_request_rebuild(coord + Vector2i(0, -1))
+	if local_z == Chunk.SIZE_Z - 1:
+		_request_rebuild(coord + Vector2i(0, 1))
+	return true
+
+func get_block_at(world_x: int, world_y: int, world_z: int) -> int:
+	return get_block_world(world_x, world_y, world_z)
+
+func _request_rebuild(coord: Vector2i) -> void:
+	var chunk: Chunk = chunks.get(coord)
+	if chunk == null or _pending_chunks.has(coord):
+		return
+	_pending_chunks[coord] = true
+	_request_mesh_build(chunk)
+
 func _compute_block_at(world_x: int, world_y: int, world_z: int) -> int:
 	var surface: int = get_terrain_height(world_x, world_z)
 	if world_y > surface:
