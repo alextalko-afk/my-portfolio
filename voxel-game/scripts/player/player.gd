@@ -74,6 +74,20 @@ func _ready() -> void:
 	health = max_health
 	_spawn_position = global_position
 
+## Applied by Game after a save loads (Player's own _ready() has already
+## run by then, setting the plain defaults this then overrides). Also
+## resets the spawn/respawn point to the loaded position and re-arms the
+## gravity gate, since the chunk under it hasn't necessarily loaded yet.
+func load_state(loaded_position: Vector3, rotation_y: float, pitch_value: float, health_value: float) -> void:
+	global_position = loaded_position
+	rotation.y = rotation_y
+	pitch = pitch_value
+	head.rotation.x = pitch
+	health = health_value
+	_spawn_position = loaded_position
+	_spawn_ready = false
+	health_changed.emit(health, max_health)
+
 func take_damage(amount: float) -> void:
 	if _is_dead or Time.get_ticks_msec() < _invulnerable_until_ms:
 		return

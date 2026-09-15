@@ -19,6 +19,24 @@ func _init() -> void:
 func get_slot(index: int) -> Dictionary:
 	return slots[index]
 
+## Blocks are saved by name, not id — ids are just BlockRegistry
+## registration order, which a future block addition could reshuffle and
+## silently corrupt an old save.
+func to_save_array() -> Array:
+	var result: Array = []
+	for slot in slots:
+		var block: BlockType = BlockRegistry.get_block(slot["id"])
+		var block_name: String = block.block_name if block != null else "air"
+		result.append({"id": block_name, "count": slot["count"]})
+	return result
+
+func load_from_array(data: Array) -> void:
+	for i in range(mini(data.size(), SLOT_COUNT)):
+		var entry: Dictionary = data[i]
+		var block_id: int = BlockRegistry.get_id_by_name(str(entry.get("id", "air")))
+		slots[i] = {"id": block_id, "count": int(entry.get("count", 0))}
+	changed.emit()
+
 ## Adds up to count of block_id, filling existing stacks first, then empty
 ## slots. Returns the amount that didn't fit.
 func add_item(block_id: int, count: int) -> int:

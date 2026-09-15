@@ -20,6 +20,16 @@ var _chunks_mutex: Mutex = Mutex.new()
 ## PackedByteArray is a copy-on-write value type, so a copy fetched here
 ## stays valid even if the dictionary entry is erased right after.
 var _chunk_blocks: Dictionary = {}
+## Vector2i chunk coord -> Dictionary[Vector3i local_pos -> block_id]. Local
+## pos uses local x/z (0..15, chunk-relative) and absolute world y (height
+## doesn't need chunk-relative treatment; every chunk spans the same full
+## column). This is the diff from generated terrain: every player edit,
+## and the only thing a save file needs to persist about the world, since
+## replaying it over freshly generated terrain reproduces exactly what was
+## there before. Guarded by _chunks_mutex — read from worker threads
+## (reapplied whenever a chunk (re)generates) and written from the main
+## thread (set_block_world).
+var _chunk_modifications: Dictionary = {}
 var noise: FastNoiseLite = FastNoiseLite.new()
 var biome_noise: FastNoiseLite = FastNoiseLite.new()
 var cave_noise: FastNoiseLite = FastNoiseLite.new()
@@ -54,6 +64,14 @@ var _last_player_chunk: Vector2i = Vector2i(999999, 999999)
 func _ready() -> void:
 	get_tree().set_auto_accept_quit(false)
 
+	# The seed must be known before noise is configured below, so a saved
+	# world regenerates identical terrain; everything else from the save
+	# (player state, time of day) is applied later by Game, once World,
+	# Player and DayNightCycle have all finished their own _ready().
+	var save_data: Dictionary = SaveSystem.load_game()
+	if save_data.has("world_seed"):
+		world_seed = int(save_data["world_seed"])
+
 	noise.seed = world_seed
 	noise.noise_type = FastNoiseLite.TYPE_PERLIN
 	noise.frequency = 0.015
@@ -82,6 +100,9 @@ func _ready() -> void:
 	_wood_id = BlockRegistry.get_id_by_name("wood")
 	_leaves_id = BlockRegistry.get_id_by_name("leaves")
 	_workbench_id = BlockRegistry.get_id_by_name("workbench")
+
+	if save_data.has("modified_blocks"):
+		load_modifications(save_data["modified_blocks"])
 
 	if player_path != NodePath():
 		_player = get_node(player_path)
@@ -202,13 +223,20 @@ func get_block_world(world_x: int, world_y: int, world_z: int) -> int:
 	if world_y < 0 or world_y >= Chunk.HEIGHT:
 		return BlockRegistry.AIR_ID
 	var coord := Vector2i(_floor_div(world_x, Chunk.SIZE_X), _floor_div(world_z, Chunk.SIZE_Z))
+	var local_x: int = world_x - coord.x * Chunk.SIZE_X
+	var local_z: int = world_z - coord.y * Chunk.SIZE_Z
 	_chunks_mutex.lock()
 	var blocks: PackedByteArray = _chunk_blocks.get(coord, PackedByteArray())
+	var mods: Dictionary = _chunk_modifications.get(coord, {})
 	_chunks_mutex.unlock()
 	if not blocks.is_empty():
-		var local_x: int = world_x - coord.x * Chunk.SIZE_X
-		var local_z: int = world_z - coord.y * Chunk.SIZE_Z
 		return blocks[Chunk.local_index(local_x, world_y, local_z)]
+	# Chunk not loaded: an edit made before it unloaded (or loaded from a
+	# save) must still win over freshly computed generation here, or a
+	# neighbor querying across this border would see stale terrain.
+	var local_key := Vector3i(local_x, world_y, local_z)
+	if mods.has(local_key):
+		return mods[local_key]
 	return compute_terrain_block(world_x, world_y, world_z)
 
 ## Breaks/places a block at the given world coordinates. Returns false and
@@ -232,6 +260,9 @@ func set_block_world(world_x: int, world_y: int, world_z: int, id: int) -> bool:
 
 	_chunks_mutex.lock()
 	_chunk_blocks[coord] = chunk.blocks
+	if not _chunk_modifications.has(coord):
+		_chunk_modifications[coord] = {}
+	_chunk_modifications[coord][Vector3i(local_x, world_y, local_z)] = id
 	_chunks_mutex.unlock()
 
 	var world_pos := Vector3i(world_x, world_y, world_z)
@@ -253,6 +284,43 @@ func set_block_world(world_x: int, world_y: int, world_z: int, id: int) -> bool:
 
 func get_block_at(world_x: int, world_y: int, world_z: int) -> int:
 	return get_block_world(world_x, world_y, world_z)
+
+## Called once at startup (before any chunk loads, so no locking needed
+## yet) to seed _chunk_modifications from a save file's "modified_blocks".
+func load_modifications(entries: Array) -> void:
+	for entry in entries:
+		var wx: int = int(entry["x"])
+		var wy: int = int(entry["y"])
+		var wz: int = int(entry["z"])
+		var block_id: int = BlockRegistry.get_id_by_name(str(entry["id"]))
+		var coord := Vector2i(_floor_div(wx, Chunk.SIZE_X), _floor_div(wz, Chunk.SIZE_Z))
+		var local_x: int = wx - coord.x * Chunk.SIZE_X
+		var local_z: int = wz - coord.y * Chunk.SIZE_Z
+		if not _chunk_modifications.has(coord):
+			_chunk_modifications[coord] = {}
+		_chunk_modifications[coord][Vector3i(local_x, wy, local_z)] = block_id
+		if block_id == _workbench_id:
+			_workbench_positions[Vector3i(wx, wy, wz)] = true
+
+## Flattens _chunk_modifications into the save file's "modified_blocks"
+## list, by block name rather than id — ids are just BlockRegistry
+## registration order, which a future block addition could reshuffle;
+## names are stable across that.
+func get_modifications_for_save() -> Array:
+	_chunks_mutex.lock()
+	var snapshot: Dictionary = _chunk_modifications.duplicate(true)
+	_chunks_mutex.unlock()
+
+	var result: Array = []
+	for coord in snapshot:
+		var mods: Dictionary = snapshot[coord]
+		for local_key in mods:
+			var world_x: int = coord.x * Chunk.SIZE_X + local_key.x
+			var world_z: int = coord.y * Chunk.SIZE_Z + local_key.z
+			var block: BlockType = BlockRegistry.get_block(mods[local_key])
+			var block_name: String = block.block_name if block != null else "air"
+			result.append({"x": world_x, "y": local_key.y, "z": world_z, "id": block_name})
+	return result
 
 func _request_rebuild(coord: Vector2i) -> void:
 	var chunk: Chunk = chunks.get(coord)
@@ -320,8 +388,22 @@ func _build_chunk_mesh_task(chunk: Chunk, coord: Vector2i, neighbor_lookup: Call
 	if not chunk.is_generated:
 		chunk.generate_terrain(self)
 		chunk.is_generated = true
+		_apply_modifications_to_chunk(chunk)
 	var data: Dictionary = chunk.build_mesh_data(neighbor_lookup)
 	call_deferred("_on_mesh_built", coord, data)
+
+## Re-applies any known edits (this session's, or loaded from a save) over
+## freshly generated terrain — needed both right after loading a save and
+## whenever a chunk the player edited earlier gets unloaded and later
+## regenerated from a walk back. Runs on the same worker thread as
+## generation, right before that chunk's own blocks are touched by
+## anything else (guarded by _pending_chunks, same as generation itself).
+func _apply_modifications_to_chunk(chunk: Chunk) -> void:
+	_chunks_mutex.lock()
+	var mods: Dictionary = _chunk_modifications.get(chunk.chunk_coord, {}).duplicate()
+	_chunks_mutex.unlock()
+	for local_key in mods:
+		chunk.set_block_local(local_key.x, local_key.y, local_key.z, mods[local_key])
 
 func _on_mesh_built(coord: Vector2i, data: Dictionary) -> void:
 	_pending_chunks.erase(coord)
