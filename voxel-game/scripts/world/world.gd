@@ -21,10 +21,27 @@ var _chunks_mutex: Mutex = Mutex.new()
 ## stays valid even if the dictionary entry is erased right after.
 var _chunk_blocks: Dictionary = {}
 var noise: FastNoiseLite = FastNoiseLite.new()
+var biome_noise: FastNoiseLite = FastNoiseLite.new()
+var cave_noise: FastNoiseLite = FastNoiseLite.new()
+var tree_noise: FastNoiseLite = FastNoiseLite.new()
+
+enum Biome { PLAINS, DESERT }
+
+const SEA_LEVEL := 38
+const LAVA_LEVEL := 10
+const CAVE_THRESHOLD := 0.55
+const CAVE_MIN_DEPTH := 4
+const TREE_TRUNK_HEIGHT := 5
+const TREE_CANOPY_RADIUS := 2
 
 var _grass_id: int = 0
 var _dirt_id: int = 0
 var _stone_id: int = 0
+var _sand_id: int = 0
+var _water_id: int = 0
+var _lava_id: int = 0
+var _wood_id: int = 0
+var _leaves_id: int = 0
 var _workbench_id: int = 0
 
 ## World positions currently holding a workbench block, so crafting can
@@ -43,9 +60,27 @@ func _ready() -> void:
 	noise.fractal_octaves = 4
 	noise.fractal_gain = 0.5
 
+	biome_noise.seed = world_seed + 1
+	biome_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	biome_noise.frequency = 0.003
+
+	cave_noise.seed = world_seed + 2
+	cave_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	cave_noise.frequency = 0.06
+	cave_noise.fractal_octaves = 3
+
+	tree_noise.seed = world_seed + 3
+	tree_noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	tree_noise.frequency = 0.6
+
 	_grass_id = BlockRegistry.get_id_by_name("grass")
 	_dirt_id = BlockRegistry.get_id_by_name("dirt")
 	_stone_id = BlockRegistry.get_id_by_name("stone")
+	_sand_id = BlockRegistry.get_id_by_name("sand")
+	_water_id = BlockRegistry.get_id_by_name("water")
+	_lava_id = BlockRegistry.get_id_by_name("lava")
+	_wood_id = BlockRegistry.get_id_by_name("wood")
+	_leaves_id = BlockRegistry.get_id_by_name("leaves")
 	_workbench_id = BlockRegistry.get_id_by_name("workbench")
 
 	if player_path != NodePath():
@@ -86,6 +121,80 @@ func get_terrain_height(world_x: int, world_z: int) -> int:
 	var height: float = 40.0 + n * 16.0
 	return int(round(height))
 
+func get_biome(world_x: int, world_z: int) -> int:
+	return Biome.DESERT if biome_noise.get_noise_2d(float(world_x), float(world_z)) > 0.15 else Biome.PLAINS
+
+func is_cave(world_x: int, world_y: int, world_z: int) -> bool:
+	return cave_noise.get_noise_3d(float(world_x), float(world_y), float(world_z)) > CAVE_THRESHOLD
+
+func _is_tree_column(world_x: int, world_z: int) -> bool:
+	if get_biome(world_x, world_z) != Biome.PLAINS:
+		return false
+	return tree_noise.get_noise_2d(float(world_x), float(world_z)) > 0.9
+
+## Tree columns (trunk base position) within canopy reach of (world_x,
+## world_z). Precompute once per column and reuse across its Y range
+## instead of re-sampling tree noise per block.
+func get_nearby_tree_columns(world_x: int, world_z: int) -> Array:
+	var result: Array = []
+	for dx in range(-TREE_CANOPY_RADIUS, TREE_CANOPY_RADIUS + 1):
+		for dz in range(-TREE_CANOPY_RADIUS, TREE_CANOPY_RADIUS + 1):
+			var cx: int = world_x + dx
+			var cz: int = world_z + dz
+			if _is_tree_column(cx, cz):
+				result.append(Vector2i(cx, cz))
+	return result
+
+## Simple trunk-plus-blob tree shape, evaluated against every tree column
+## that could reach this position. Deterministic and purely a function of
+## world position, so it agrees at chunk borders without any special-casing.
+func get_tree_block_at(world_x: int, world_y: int, world_z: int, tree_columns: Array) -> int:
+	for tree_col in tree_columns:
+		var cx: int = tree_col.x
+		var cz: int = tree_col.y
+		var trunk_base: int = get_terrain_height(cx, cz)
+		if world_x == cx and world_z == cz and world_y > trunk_base and world_y <= trunk_base + TREE_TRUNK_HEIGHT:
+			return _wood_id
+		var canopy_center_y: int = trunk_base + TREE_TRUNK_HEIGHT
+		var dy: int = world_y - canopy_center_y
+		if dy >= -2 and dy <= 1:
+			var dist: float = Vector2(world_x - cx, world_z - cz).length()
+			var radius: float = 2.2 if dy <= 0 else 1.4
+			if dist <= radius:
+				return _leaves_id
+	return BlockRegistry.AIR_ID
+
+## The single "ground truth" for what belongs at a coordinate, purely from
+## generation rules. Bulk chunk generation precomputes surface/biome/tree
+## columns once per (x,z) column for speed; this per-block version (used
+## for the rare cross-chunk fallback query) just does that itself.
+func compute_terrain_block(world_x: int, world_y: int, world_z: int) -> int:
+	var surface: int = get_terrain_height(world_x, world_z)
+	var biome: int = get_biome(world_x, world_z)
+	var tree_columns: Array = get_nearby_tree_columns(world_x, world_z)
+	return compute_column_block(world_x, world_y, world_z, surface, biome, tree_columns)
+
+func compute_column_block(world_x: int, world_y: int, world_z: int, surface: int, biome: int, tree_columns: Array) -> int:
+	if world_y > surface:
+		if world_y <= SEA_LEVEL:
+			return _water_id
+		if world_y <= surface + TREE_TRUNK_HEIGHT + TREE_CANOPY_RADIUS + 2:
+			return get_tree_block_at(world_x, world_y, world_z, tree_columns)
+		return BlockRegistry.AIR_ID
+
+	var block_id: int
+	if world_y == surface:
+		block_id = _sand_id if biome == Biome.DESERT else _grass_id
+	elif world_y >= surface - 3:
+		block_id = _sand_id if biome == Biome.DESERT else _dirt_id
+	else:
+		block_id = _stone_id
+
+	if block_id == _stone_id and world_y < surface - CAVE_MIN_DEPTH and is_cave(world_x, world_y, world_z):
+		return _lava_id if world_y <= LAVA_LEVEL else BlockRegistry.AIR_ID
+
+	return block_id
+
 ## Thread-safe: safe to call from worker threads (used as the chunk-border
 ## neighbor lookup during mesh building). Reads only the plain-data block
 ## dictionary, never the Chunk node itself.
@@ -100,7 +209,7 @@ func get_block_world(world_x: int, world_y: int, world_z: int) -> int:
 		var local_x: int = world_x - coord.x * Chunk.SIZE_X
 		var local_z: int = world_z - coord.y * Chunk.SIZE_Z
 		return blocks[Chunk.local_index(local_x, world_y, local_z)]
-	return _compute_block_at(world_x, world_y, world_z)
+	return compute_terrain_block(world_x, world_y, world_z)
 
 ## Breaks/places a block at the given world coordinates. Returns false and
 ## does nothing if the target chunk isn't loaded yet or is mid-rebuild
@@ -152,16 +261,6 @@ func _request_rebuild(coord: Vector2i) -> void:
 	_pending_chunks[coord] = true
 	_request_mesh_build(chunk)
 
-func _compute_block_at(world_x: int, world_y: int, world_z: int) -> int:
-	var surface: int = get_terrain_height(world_x, world_z)
-	if world_y > surface:
-		return BlockRegistry.AIR_ID
-	elif world_y == surface:
-		return _grass_id
-	elif world_y >= surface - 3:
-		return _dirt_id
-	return _stone_id
-
 func _update_loaded_chunks(center: Vector2i) -> void:
 	var needed: Dictionary = {}
 	for dx in range(-render_distance, render_distance + 1):
@@ -197,12 +296,8 @@ func _load_chunk(coord: Vector2i) -> void:
 	chunk.position = Vector3(coord.x * Chunk.SIZE_X, 0, coord.y * Chunk.SIZE_Z)
 	add_child(chunk)
 
-	var height_sampler: Callable = Callable(self, "get_terrain_height")
-	chunk.generate_terrain(height_sampler, _grass_id, _dirt_id, _stone_id)
-
 	_chunks_mutex.lock()
 	chunks[coord] = chunk
-	_chunk_blocks[coord] = chunk.blocks
 	_chunks_mutex.unlock()
 
 	_request_mesh_build(chunk)
@@ -217,7 +312,14 @@ func _request_mesh_build(chunk: Chunk) -> void:
 	var task_id: int = WorkerThreadPool.add_task(Callable(self, "_build_chunk_mesh_task").bind(chunk, coord, neighbor_lookup))
 	_pending_task_ids[coord] = task_id
 
+## Generation (first load only, guarded by is_generated) and mesh building
+## both run here so a chunk's ~11ms of terrain generation never blocks the
+## main thread — with render_distance 4 (~49 chunks) that would otherwise
+## stall a single frame for half a second on initial world load.
 func _build_chunk_mesh_task(chunk: Chunk, coord: Vector2i, neighbor_lookup: Callable) -> void:
+	if not chunk.is_generated:
+		chunk.generate_terrain(self)
+		chunk.is_generated = true
 	var data: Dictionary = chunk.build_mesh_data(neighbor_lookup)
 	call_deferred("_on_mesh_built", coord, data)
 
@@ -227,6 +329,9 @@ func _on_mesh_built(coord: Vector2i, data: Dictionary) -> void:
 	var chunk: Chunk = chunks.get(coord)
 	if chunk == null or not is_instance_valid(chunk):
 		return
+	_chunks_mutex.lock()
+	_chunk_blocks[coord] = chunk.blocks
+	_chunks_mutex.unlock()
 	chunk.apply_mesh_data(data)
 
 ## Sent when the OS requests the window close (X button / Alt+F4). Waiting

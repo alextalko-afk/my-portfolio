@@ -20,6 +20,8 @@ const TILE_WORKBENCH_SIDE := 11
 const TILE_STICK := 12
 const TILE_WOOD_TOOL := 13
 const TILE_STONE_TOOL := 14
+const TILE_WATER := 15
+const TILE_LAVA := 16
 
 var blocks: Array[BlockType] = []
 var atlas_texture: ImageTexture
@@ -262,6 +264,30 @@ func _register_blocks() -> void:
 	stone_pickaxe.drop_item = ""
 	register_block(stone_pickaxe)
 
+	var water := BlockType.new()
+	water.id = 15
+	water.block_name = "water"
+	water.texture_top = TILE_WATER
+	water.texture_side = TILE_WATER
+	water.texture_bottom = TILE_WATER
+	water.is_transparent = true
+	water.is_solid = false
+	water.hardness = 0.0
+	water.drop_item = ""
+	register_block(water)
+
+	var lava := BlockType.new()
+	lava.id = 16
+	lava.block_name = "lava"
+	lava.texture_top = TILE_LAVA
+	lava.texture_side = TILE_LAVA
+	lava.texture_bottom = TILE_LAVA
+	lava.is_transparent = false
+	lava.is_solid = false
+	lava.hardness = 0.0
+	lava.drop_item = ""
+	register_block(lava)
+
 func _build_atlas() -> void:
 	var image: Image = TextureAtlasBuilder.build_atlas_image()
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_DIRT, Color(0.42, 0.28, 0.16), 0.18)
@@ -279,6 +305,8 @@ func _build_atlas() -> void:
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_STICK, Color(0.6, 0.46, 0.26), 0.2)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_WOOD_TOOL, Color(0.66, 0.48, 0.26), 0.18)
 	TextureAtlasBuilder.paint_noisy_tile(image, TILE_STONE_TOOL, Color(0.55, 0.55, 0.58), 0.16)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_WATER, Color(0.16, 0.38, 0.75), 0.16)
+	TextureAtlasBuilder.paint_noisy_tile(image, TILE_LAVA, Color(0.85, 0.32, 0.05), 0.22)
 	atlas_texture = ImageTexture.create_from_image(image)
 
 func _build_material() -> void:

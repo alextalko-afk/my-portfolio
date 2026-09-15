@@ -22,6 +22,10 @@ const FACES := [
 
 var chunk_coord: Vector2i = Vector2i.ZERO
 var blocks: PackedByteArray = PackedByteArray()
+## Set once generate_terrain() has filled this chunk, so a later rebuild
+## (triggered by an edit to this or a neighboring chunk) knows to rebuild
+## the mesh only, never regenerate terrain over player edits.
+var is_generated: bool = false
 
 var mesh_instance: MeshInstance3D
 var static_body: StaticBody3D
@@ -51,26 +55,26 @@ func set_block_local(x: int, y: int, z: int, id: int) -> void:
 		return
 	blocks[local_index(x, y, z)] = id
 
-## Pure computation, safe to call from a worker thread: fills the column
-## using a surface-height sampler (world_x, world_z) -> int.
-func generate_terrain(height_sampler: Callable, grass_id: int, dirt_id: int, stone_id: int) -> void:
+## Runs on the main thread (unlike mesh building, terrain generation never
+## touches nodes, but World.generate is not itself thread-safe to call
+## concurrently since its noise objects are shared, unguarded state).
+## Fills each column via World.compute_column_block, which folds in
+## biome strata, sea-level water, cave carving and tree placement.
+func generate_terrain(world: VoxelWorld) -> void:
 	var world_x_origin: int = chunk_coord.x * SIZE_X
 	var world_z_origin: int = chunk_coord.y * SIZE_Z
 	for lx in range(SIZE_X):
 		for lz in range(SIZE_Z):
 			var world_x: int = world_x_origin + lx
 			var world_z: int = world_z_origin + lz
-			var surface: int = int(height_sampler.call(world_x, world_z))
-			surface = clampi(surface, 1, HEIGHT - 2)
-			for ly in range(surface + 1):
-				var id: int
-				if ly == surface:
-					id = grass_id
-				elif ly >= surface - 3:
-					id = dirt_id
-				else:
-					id = stone_id
-				blocks[local_index(lx, ly, lz)] = id
+			var surface: int = clampi(world.get_terrain_height(world_x, world_z), 1, HEIGHT - 2)
+			var biome: int = world.get_biome(world_x, world_z)
+			var tree_columns: Array = world.get_nearby_tree_columns(world_x, world_z)
+			var max_y: int = mini(HEIGHT - 1, maxi(surface + VoxelWorld.TREE_TRUNK_HEIGHT + VoxelWorld.TREE_CANOPY_RADIUS + 2, VoxelWorld.SEA_LEVEL))
+			for ly in range(max_y + 1):
+				var id: int = world.compute_column_block(world_x, ly, world_z, surface, biome, tree_columns)
+				if id != BlockRegistry.AIR_ID:
+					blocks[local_index(lx, ly, lz)] = id
 
 ## Pure computation, safe to call from a worker thread. neighbor_lookup is
 ## Callable(world_x:int, world_y:int, world_z:int) -> int, used only at the
